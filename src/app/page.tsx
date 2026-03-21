@@ -352,10 +352,10 @@ const renderDate = (dateStr: string | undefined) => {
                                 <Menu size={20} />
                             </button>
                             <div className="flex flex-col lg:flex-row lg:items-center lg:gap-2 overflow-hidden">
-                                <span className="text-sm lg:text-lg font-black text-slate-900 uppercase lg:pr-3 lg:border-r border-slate-200">
+                                <span className="text-xs sm:text-sm lg:text-lg font-black text-slate-900 uppercase lg:pr-3 lg:border-r border-slate-200">
                                     OLÁ, {userName || userRole || 'NOME'}
                                 </span>
-                                <h2 className="text-sm lg:text-lg font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">
+                                <h2 className="text-xs sm:text-sm lg:text-lg font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">
                                     {selectedTeams.length === 0 ? "Geral (Todas)" : selectedTeams.join(", ")}
                                 </h2>
                                 {selectedStatuses.length > 0 && (
@@ -370,36 +370,36 @@ const renderDate = (dateStr: string | undefined) => {
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto mt-2 sm:mt-0">
                             <div className="relative w-full sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 <input 
                                     type="text" 
                                     placeholder="Buscar paciente..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full transition-all text-black font-semibold"
+                                    className="pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 bg-slate-100 border-none rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 w-full transition-all text-black font-semibold"
                                 />
                             </div>
 
                             {userRole === 'Administrador' && (
                                 <button 
                                     onClick={() => window.location.href = '/admin'}
-                                    className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-slate-700 transition-all"
+                                    className="flex items-center justify-center gap-1 sm:gap-2 bg-slate-800 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold shadow-md hover:bg-slate-700 transition-all"
                                     title="Ir para Painel Administrativo"
                                 >
-                                    <Users size={18} />
+                                    <Users className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
                                     <span className="hidden lg:inline">Painel Admin</span>
                                 </button>
                             )}
 
                             <button 
                                 onClick={() => { setSelectedPatient(null); setIsModalOpen(true); }}
-                                className="flex items-center gap-2 bg-[#d4af37] text-[#0a1f44] px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-sm font-black shadow-lg shadow-[#d4af37]/20 hover:bg-[#c5a059] transition-all active:scale-95"
+                                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-[#d4af37] text-[#0a1f44] px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-black shadow-lg shadow-[#d4af37]/20 hover:bg-[#c5a059] transition-all active:scale-95"
                                 aria-label="Adicionar novo paciente"
                                 title="Novo Paciente"
                             >
-                                <Plus size={20} />
+                                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                                 <span className="hidden sm:inline">Novo</span>
                             </button>
                         </div>
