@@ -10,8 +10,10 @@ import {
 import Image from "next/image";
 import PatientModal from "@/components/PatientModal";
 import ReportModal from "@/components/ReportModal";
+import LgpdModal from "@/components/LgpdModal";
 import { Patient, PatientStatus } from "../types";
 import { getPatients } from "./actions";
+import { logLgpdConsentAction } from "./staff-actions";
 
 type SortConfig = {
     key: keyof Patient | 'none';
@@ -33,6 +35,7 @@ export default function Dashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userRole, setUserRole] = useState<string>("");
     const [userName, setUserName] = useState<string>("");
+    const [showLgpdModal, setShowLgpdModal] = useState<boolean>(false);
 
     const teamIcons: Record<string, React.ElementType> = {
         "Geral (Todas)": Activity,
@@ -77,7 +80,14 @@ export default function Dashboard() {
         
         const nameMatch = document.cookie.match(/username=([^;]+)/);
         if (nameMatch) {
-            setUserName(decodeURIComponent(nameMatch[1]));
+            const decodedName = decodeURIComponent(nameMatch[1]);
+            setUserName(decodedName);
+            
+            // LGPD Check
+            const lgpdAccepted = localStorage.getItem(`lgpd_accepted_${decodedName}`);
+            if (!lgpdAccepted) {
+                setShowLgpdModal(true);
+            }
         }
     }, []);
 
@@ -86,6 +96,18 @@ export default function Dashboard() {
             key,
             direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
+    };
+
+    const handleLgpdAccept = async () => {
+        try {
+            await logLgpdConsentAction(userName);
+            localStorage.setItem(`lgpd_accepted_${userName}`, 'true');
+            setShowLgpdModal(false);
+        } catch (error) {
+            console.error("Failed to log LGPD consent:", error);
+            localStorage.setItem(`lgpd_accepted_${userName}`, 'true');
+            setShowLgpdModal(false);
+        }
     };
 
     const handleDragStart = (e: React.DragEvent, patientId: string) => {
@@ -723,6 +745,12 @@ const renderDate = (dateStr: string | undefined) => {
                 isOpen={isReportOpen}
                 onClose={() => setIsReportOpen(false)}
             />
+            {showLgpdModal && (
+                <LgpdModal 
+                    userName={userName}
+                    onAccept={handleLgpdAccept}
+                />
+            )}
         </div>
     );
 }

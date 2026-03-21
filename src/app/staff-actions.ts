@@ -119,3 +119,13 @@ export async function recoverPasswordAction(username: string, role: string) {
 export async function getAccessLogsAction(): Promise<{ timestamp: string, username: string, role: string }[]> {
     return await getAccessLogs();
 }
+
+export async function logLgpdConsentAction(username: string) {
+    try {
+        await logAccess(username, 'ACEITE LGPD');
+        return { success: true };
+    } catch (error) {
+        console.error('Error logging LGPD consent:', error);
+        return { success: false, error: 'Erro ao registrar aceite da LGPD' };
+    }
+}

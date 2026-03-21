@@ -691,7 +691,8 @@ export default function AdminDashboard() {
                                                         <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
                                                         <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
                                                         <td className="px-6 py-4">
-                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                                log.role === 'ACEITE LGPD' ? 'bg-red-100 text-red-700 font-black' :
                                                                 log.role === 'Administrador' ? 'bg-slate-800 text-white' :
                                                                 log.role === 'Médico Preceptor' ? 'bg-indigo-100 text-indigo-700' :
                                                                 'bg-emerald-100 text-emerald-700'
