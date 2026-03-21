@@ -1,0 +1,112 @@
+[
+  {
+    "fullName": "Gustavo Andreazza Laporte",
+    "crm": "29176",
+    "systemName": "LAPORTE",
+    "phone": "51984013305",
+    "email": "",
+    "type": "preceptor",
+    "username": "29176",
+    "password": "29176",
+    "id": "xz2ep3r"
+  },
+  {
+    "fullName": "Administrador do Sistema",
+    "crm": "",
+    "systemName": "ADMIN",
+    "phone": "",
+    "email": "laportegustavo@gmail.com",
+    "type": "admin",
+    "username": "admin",
+    "password": "admin123",
+    "id": "admin01"
+  },
+  {
+    "fullName": "Renan Scopel Antunes ",
+    "crm": "45930",
+    "systemName": "RENAN",
+    "phone": "(55) 99131-9462",
+    "email": "renansa.17@gmail.com",
+    "type": "resident",
+    "username": "45930",
+    "password": "45930",
+    "id": "8ea31ep"
+  },
+  {
+    "fullName": "Oscar Bladimir Aguilera León",
+    "crm": "57748",
+    "systemName": "OSCAR",
+    "phone": "(51) 99779-0893",
+    "email": "oscarblad9@gmail.com",
+    "type": "resident",
+    "username": "57748",
+    "password": "57748",
+    "id": "2yc4ywe"
+  },
+  {
+    "fullName": "Maria Eduarda Ampessan Panassol",
+    "crm": "46235",
+    "systemName": "MARIA EDUARDA",
+    "phone": "(54) 99191-0035",
+    "email": "dudampessan@hotmail.com",
+    "type": "resident",
+    "username": "46235",
+    "password": "46235",
+    "id": "1ir8v90"
+  },
+  {
+    "fullName": "Daniel alejandro gomez aillon ",
+    "crm": "60362",
+    "systemName": "DANIEL",
+    "phone": "(51) 99531-3756",
+    "email": "drdanielgomez.89@gmail.com",
+    "type": "resident",
+    "username": "60362",
+    "password": "60362",
+    "id": "mvqy8t7"
+  },
+  {
+    "fullName": "Alessandra Rebelatto Boesing",
+    "crm": "50570",
+    "systemName": "ALESSANDRA",
+    "phone": "(51) 99992-2086",
+    "email": "alerebelattoboesing@gmail.com",
+    "type": "resident",
+    "username": "50570",
+    "password": "50570",
+    "id": "t94yw8z"
+  },
+  {
+    "fullName": "Bruna Fraga Mezari ",
+    "crm": "59455",
+    "systemName": "BRUNA",
+    "phone": "(48) 99802-5725",
+    "email": "brunafraga_mezari@hotmail.com",
+    "type": "resident",
+    "username": "59455",
+    "password": "59455",
+    "id": "crb40kg"
+  },
+  {
+    "fullName": "Gabriela Salzano Silva",
+    "crm": "54580",
+    "systemName": "GABRIELA",
+    "phone": "(51) 99978-2944",
+    "email": "gsalzanosilva@gmail.com",
+    "type": "resident",
+    "username": "54580",
+    "password": "54580",
+    "id": "ob9d0t2"
+  },
+  {
+    "fullName": "Paúl Esteban Hugo Garate",
+    "crm": "55122",
+    "systemName": "PAUL",
+    "phone": "(51) 99267-8761",
+    "email": "mdpaulhugo@hotmail.com",
+    "type": "resident",
+    "username": "55122",
+    "password": "55122",
+    "id": "wgqmsjt"
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "teams": [
+    "MELANOMA",
+    "CEC & CBC SEDAÇÃO",
+    "TGI",
+    "PIO",
+    "PERITONIO",
+    "HPB",
+    "ONCOGINECO",
+    "PORTOCATH",
+    "LOCAIS",
+    "EQUIPE_TESTE_AUTO"
+  ],
+  "systems": [
+    "PELE",
+    "ESOFAGO",
+    "ESTOMAGO MALIGNO",
+    "ESTOMAGO BENIGNO",
+    "PARTES MOLES",
+    "COLORETAL",
+    "OUTROS",
+    "HÉRNIAS",
+    "OVÁRIO",
+    "COLO UTERINO",
+    "CONIZAÇÃO",
+    "HISTEROSCOPIA",
+    "MAMA",
+    "VULVA/VAGINA",
+    "CORPO UTERINO",
+    "PÂNCREAS",
+    "DUODENO",
+    "SISTEMA_TESTE_AUTO"
+  ]
+}
