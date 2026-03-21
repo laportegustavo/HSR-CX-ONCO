@@ -41,6 +41,7 @@ const statusOptions: PatientStatus[] = [
     "CIRURGIA REALIZADA",
     "OBSERVAÇÕES",
     "PENDÊNCIAS",
+    "PERDA DE SEGMENTO",
     "PRONTOS",
     "SEM STATUS"
 ];

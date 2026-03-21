@@ -4,6 +4,7 @@ export type PatientStatus =
   | 'OBSERVAÇÕES'
   | 'AGENDADOS'
   | 'CIRURGIA REALIZADA'
+  | 'PERDA DE SEGMENTO'
   | 'SEM STATUS';
 
 export interface Patient {

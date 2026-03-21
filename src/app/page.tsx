@@ -178,18 +178,21 @@ export default function Dashboard() {
             { label: "AGENDADOS", type: 'AGENDADOS' as PatientStatus, count: base.filter(p => p.status === 'AGENDADOS').length, utiCount: base.filter(p => p.status === 'AGENDADOS' && p.needsICU === 'Sim').length, color: "text-blue-600", bg: "bg-blue-50", border: 'border-blue-400' },
             { label: "OBSERVAÇÕES", type: 'OBSERVAÇÕES' as PatientStatus, count: base.filter(p => p.status === 'OBSERVAÇÕES').length, utiCount: base.filter(p => p.status === 'OBSERVAÇÕES' && p.needsICU === 'Sim').length, color: "text-amber-600", bg: "bg-amber-50", border: 'border-amber-400' },
             { label: "PENDÊNCIAS", type: 'PENDÊNCIAS' as PatientStatus, count: base.filter(p => p.status === 'PENDÊNCIAS').length, utiCount: base.filter(p => p.status === 'PENDÊNCIAS' && p.needsICU === 'Sim').length, color: "text-red-600", bg: "bg-red-50", border: 'border-red-400' },
-            { label: "PRONTOS", type: 'PRONTOS' as PatientStatus, count: base.filter(p => p.status === 'PRONTOS').length, utiCount: base.filter(p => p.status === 'PRONTOS' && p.needsICU === 'Sim').length, color: "text-emerald-600", bg: "bg-emerald-50", border: 'border-emerald-400' },
-            { label: "REALIZADA", type: 'CIRURGIA REALIZADA' as PatientStatus, count: base.filter(p => p.status === 'CIRURGIA REALIZADA').length, utiCount: base.filter(p => p.status === 'CIRURGIA REALIZADA' && p.needsICU === 'Sim').length, color: "text-orange-500", bg: "bg-blue-50", border: 'border-blue-400' },
+            { label: "PRONTOS", type: 'PRONTOS' as PatientStatus, count: base.filter(p => p.status === 'PRONTOS').length, utiCount: base.filter(p => p.status === 'PRONTOS' && p.needsICU === 'Sim').length, color: "text-indigo-600", bg: "bg-indigo-50", border: 'border-indigo-400' },
+            { label: "CIRURGIA REALIZADA", type: 'CIRURGIA REALIZADA' as PatientStatus, count: base.filter(p => p.status === 'CIRURGIA REALIZADA').length, utiCount: base.filter(p => p.status === 'CIRURGIA REALIZADA' && p.needsICU === 'Sim').length, color: "text-emerald-600", bg: "bg-emerald-50", border: 'border-emerald-400' },
+            { label: "PERDA DE SEGMENTO", type: 'PERDA DE SEGMENTO' as PatientStatus, count: base.filter(p => p.status === 'PERDA DE SEGMENTO').length, utiCount: base.filter(p => p.status === 'PERDA DE SEGMENTO' && p.needsICU === 'Sim').length, color: "text-[#78350f]", bg: "bg-[#fef3c7]", border: 'border-[#78350f]' },
         ];
     }, [patients, searchTerm, selectedTeams]);
 
     const getStatusStyle = (status: PatientStatus) => {
         switch (status) {
-            case "PRONTOS": return "bg-emerald-500 text-white";
+            case "PRONTOS": return "bg-indigo-500 text-white";
             case "PENDÊNCIAS": return "bg-rose-500 text-white";
             case "OBSERVAÇÕES": return "bg-amber-400 text-white";
             case "AGENDADOS": return "bg-blue-500 text-white";
-            case "CIRURGIA REALIZADA": return "bg-orange-500 text-white";
+            case "CIRURGIA REALIZADA": return "bg-emerald-500 text-white";
+            case "PERDA DE SEGMENTO": return "bg-[#78350f] text-white";
+            case "SEM STATUS": return "bg-slate-400 text-white";
             default: return "bg-slate-400 text-white";
         }
     };
@@ -509,9 +512,9 @@ const renderDate = (dateStr: string | undefined) => {
                                         (isSelected ? stat.border + ' ' + stat.bg + ' ring-4 ring-slate-200/50' : "bg-white border-transparent")
                                     }`}
                                 >
-                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'REALIZADA' ? 'text-orange-500' : 'text-slate-900')}`}>{stat.count}</span>
+                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'REALIZADA' ? 'text-emerald-500' : stat.label === 'PERDA DE SEGMENTO' ? 'text-[#78350f]' : stat.label === 'PRONTOS' ? 'text-indigo-600' : 'text-slate-900')}`}>{stat.count}</span>
                                     <div className="flex items-center gap-1 sm:gap-2">
-                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${stat.label === 'REALIZADA' ? 'bg-orange-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
+                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${stat.label === 'REALIZADA' ? 'bg-emerald-500' : stat.label === 'PERDA DE SEGMENTO' ? 'bg-[#78350f]' : stat.label === 'PRONTOS' ? 'bg-indigo-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
                                         <span className={`text-[7px] sm:text-[8px] lg:text-[10px] font-bold uppercase tracking-wider ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
                                     </div>
                                 </div>
@@ -672,11 +675,13 @@ const renderDate = (dateStr: string | undefined) => {
                              )}
                         </>
                     ) : (
-                        <div className="flex gap-6 overflow-x-auto pb-4 h-full min-h-[500px]">
+                        <div className="flex gap-4 sm:gap-6 min-w-full pb-4">
                             {(selectedStatuses.length > 0
-                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA"].filter(s => selectedStatuses.includes(s as PatientStatus))
-                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA"]
-                            ).map((status) => (
+                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGMENTO"].filter(s => selectedStatuses.includes(s as PatientStatus))
+                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGMENTO"]
+                            ).map((status) => {
+                                const colPatients = filteredPatients.filter(p => p.status === status);
+                                return (
                                 <div 
                                     key={status} 
                                     onDragOver={handleDragOver}
@@ -686,11 +691,11 @@ const renderDate = (dateStr: string | undefined) => {
                                     <div className="flex items-center justify-between px-1">
                                         <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">{status}</h3>
                                         <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
-                                            {filteredPatients.filter(p => p.status === status).length}
+                                            {colPatients.length}
                                         </span>
                                     </div>
                                     <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-                                        {filteredPatients.filter(p => p.status === status).map((p) => (
+                                        {colPatients.map((p) => (
                                             <div 
                                                 key={p.id} 
                                                 draggable
@@ -719,7 +724,8 @@ const renderDate = (dateStr: string | undefined) => {
                                         ))}
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </main>
