@@ -336,7 +336,7 @@ const renderDate = (dateStr: string | undefined) => {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col h-screen overflow-hidden mt-6 sm:mt-0">
                 {/* Topbar */}
                 {/* Topbar */}
                 <header className="bg-white border-b border-slate-200 flex flex-col shrink-0">
@@ -482,15 +482,15 @@ const renderDate = (dateStr: string | undefined) => {
                                             );
                                         }
                                     }}
-                                    className={`p-3 sm:p-4 rounded-2xl border-2 shadow-sm flex flex-col gap-1 items-start cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${
+                                    className={`p-2 sm:p-4 rounded-xl sm:rounded-2xl border-2 shadow-sm flex flex-col gap-0.5 sm:gap-1 items-start cursor-pointer transition-all hover:scale-[1.02] active:scale-95 ${
                                         stat.isSummary ? (isSelected ? 'border-sky-500 bg-[#0a1f44] ring-4 ring-sky-500/10' : 'bg-[#0a1f44] border-transparent') : 
                                         (isSelected ? stat.border + ' ' + stat.bg + ' ring-4 ring-slate-200/50' : "bg-white border-transparent")
                                     }`}
                                 >
-                                    <span className={`text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'REALIZADA' ? 'text-orange-500' : 'text-slate-900')}`}>{stat.count}</span>
-                                    <div className="flex items-center gap-2">
-                                        {!stat.isSummary && <div className={`w-2 h-2 rounded-full ${stat.label === 'REALIZADA' ? 'bg-orange-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
-                                        <span className={`text-[8px] lg:text-[10px] font-bold uppercase tracking-wider ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
+                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'REALIZADA' ? 'text-orange-500' : 'text-slate-900')}`}>{stat.count}</span>
+                                    <div className="flex items-center gap-1 sm:gap-2">
+                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${stat.label === 'REALIZADA' ? 'bg-orange-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
+                                        <span className={`text-[7px] sm:text-[8px] lg:text-[10px] font-bold uppercase tracking-wider ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
                                     </div>
                                 </div>
                             );
@@ -584,56 +584,57 @@ const renderDate = (dateStr: string | undefined) => {
                             </div>
 
                             {/* Mobile Card View */}
-                            <div className="lg:hidden space-y-4">
+                            <div className="lg:hidden space-y-2 sm:space-y-4">
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
-                                        <div key={i} className="bg-white p-6 rounded-2xl animate-pulse h-32 w-full shadow-sm" />
+                                        <div key={i} className="bg-white p-4 sm:p-6 rounded-2xl animate-pulse h-32 w-full shadow-sm" />
                                     ))
                                 ) : (
                                     filteredPatients.map((patient) => (
                                         <div 
                                             key={patient.id}
                                             onClick={() => { setSelectedPatient(patient); setIsModalOpen(true); }}
-                                            className={`bg-white p-5 rounded-3xl border-2 transition-all active:scale-[0.98] ${
+                                            className={`bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl border-2 transition-all active:scale-[0.98] ${
                                                 patient.priority === '1' ? 'border-red-100' :
                                                 patient.priority === '2' ? 'border-yellow-100' :
                                                 'border-slate-100'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-start mb-4">
-                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-wide ${getStatusStyle(patient.status)}`}>
+                                            <div className="flex justify-between items-start mb-2 sm:mb-4">
+                                                <span className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-black tracking-wide ${getStatusStyle(patient.status)}`}>
                                                     {patient.status}
                                                 </span>
-                                                <div className={`p-1.5 rounded-lg ${patient.priority === '1' ? 'bg-red-50 text-red-600' : patient.priority === '2' ? 'bg-yellow-50 text-yellow-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                                    <Activity size={16} />
+                                                <div className={`p-1 sm:p-1.5 rounded-lg ${patient.priority === '1' ? 'bg-red-50 text-red-600' : patient.priority === '2' ? 'bg-yellow-50 text-yellow-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                    <Activity size={14} className="sm:hidden" />
+                                                    <Activity size={16} className="hidden sm:block" />
                                                 </div>
                                             </div>
                                             
-                                            <div className="mb-4">
-                                                <h4 className="text-base font-bold text-slate-800 leading-tight mb-1">{patient.name}</h4>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prontuário: {patient.medicalRecord}</p>
+                                            <div className="mb-2 sm:mb-4">
+                                                <h4 className="text-sm sm:text-base font-bold text-slate-800 leading-tight mb-0.5 sm:mb-1">{patient.name}</h4>
+                                                <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prontuário: {patient.medicalRecord}</p>
                                             </div>
 
-                                            <div className="flex flex-col gap-2 pt-4 border-t border-slate-50">
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipe / Sistema</span>
-                                                    <span className="text-xs font-bold text-slate-700 text-right">{patient.team} <span className="text-slate-300 mx-1">•</span> {patient.sistema}</span>
+                                            <div className="flex flex-col gap-1 sm:gap-2 pt-2 sm:pt-4 border-t border-slate-50">
+                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipe / Sistema</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.team} <span className="text-slate-300 mx-1">•</span> {patient.sistema}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data AIH</span>
-                                                    <span className="text-xs font-bold text-slate-700 text-right">{renderDate(patient.aihDate)}</span>
+                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data AIH</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(patient.aihDate)}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Cirurgia</span>
-                                                    <span className="text-xs font-bold text-slate-700 text-right">{renderDate(patient.surgeryDate)}</span>
+                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Cirurgia</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(patient.surgeryDate)}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preceptor</span>
-                                                    <span className="text-xs font-bold text-slate-700 text-right">{patient.preceptor || '--'}</span>
+                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Preceptor</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.preceptor || '--'}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Residente</span>
-                                                    <span className="text-xs font-bold text-slate-700 text-right">{patient.resident || '--'}</span>
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Residente</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.resident || '--'}</span>
                                                 </div>
                                             </div>
                                         </div>
