@@ -250,6 +250,36 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                         </div>
                     </div>
 
+                    {/* Date Range filter */}
+                    <div className="space-y-3 pt-4 border-t border-slate-50">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Período da Cirurgia</h3>
+                            { (startDate || endDate) && (
+                                <button onClick={() => { setStartDate(''); setEndDate(''); }} className="text-[10px] text-slate-400 font-bold hover:text-rose-500 transition-colors tracking-widest uppercase">Limpar Período</button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Inicial</label>
+                                <input 
+                                    type="date" 
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 transition-all uppercase tracking-wide"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Final</label>
+                                <input 
+                                    type="date" 
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 transition-all uppercase tracking-wide"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Filters section */}
                     <div className="space-y-3 pt-4 border-t border-slate-50 relative">
                         <div className="flex items-center justify-between">
