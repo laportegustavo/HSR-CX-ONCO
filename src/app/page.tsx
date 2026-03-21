@@ -377,21 +377,9 @@ const renderDate = (dateStr: string | undefined) => {
                                 <Menu size={20} />
                             </button>
                             <div className="flex flex-col lg:flex-row lg:items-center lg:gap-2 overflow-hidden">
-                                <span className="text-xs sm:text-sm lg:text-lg font-black text-slate-900 uppercase lg:pr-3 lg:border-r border-slate-200">
+                                <span className="text-xs sm:text-sm lg:text-lg font-black text-slate-900 uppercase">
                                     OLÁ, {userName || userRole || 'NOME'}
                                 </span>
-                                <h2 className="text-xs sm:text-sm lg:text-lg font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[200px] lg:max-w-none">
-                                    {selectedTeams.length === 0 ? "Geral (Todas)" : selectedTeams.join(", ")}
-                                </h2>
-                                {selectedStatuses.length > 0 && (
-                                    <div className="flex gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                                        {selectedStatuses.map(status => (
-                                            <span key={status} className={`shrink-0 w-fit px-2 py-0.5 rounded text-[8px] lg:text-[10px] font-bold ${getStatusStyle(status)}`}>
-                                                {status}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                         </div>
 
