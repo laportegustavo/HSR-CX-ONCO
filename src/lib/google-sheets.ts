@@ -4,12 +4,16 @@ import { Patient, PatientStatus, MedicalStaff } from '@/types';
 // Essa função autentica com a Google Cloud Usando a Service Account
 const getAuth = () => {
     const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '').trim();
-    let private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '').trim();
-
-    // Auto-fix se o usuário copiou apenas o meio da chave e cortou o cabeçalho (comum ao usar 2 cliques)
-    if (private_key && !private_key.includes('BEGIN PRIVATE KEY')) {
-        private_key = `-----BEGIN PRIVATE KEY-----\n${private_key}\n-----END PRIVATE KEY-----\n`;
-    }
+    
+    // Leitura à prova de balas da Chave Mestra
+    // Extrai APENAS os caracteres base64 válidos de qualquer lixo que o usuário tenha colado
+    const base64Body = process.env.GOOGLE_PRIVATE_KEY?.replace(/-----.*?-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
+    
+    // Recria as quebras de linha a cada 64 caracteres (padrão exigido pelo Google)
+    const lines = base64Body?.match(/.{1,64}/g)?.join('\n') || '';
+    
+    // Monta a chave perfeita
+    const private_key = `-----BEGIN PRIVATE KEY-----\n${lines}\n-----END PRIVATE KEY-----\n`;
 
     const credentials = {
         client_email,
