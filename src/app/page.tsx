@@ -370,15 +370,15 @@ const renderDate = (dateStr: string | undefined) => {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <div className="relative hidden md:block">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                            <div className="relative w-full sm:w-64">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                 <input 
                                     type="text" 
                                     placeholder="Buscar paciente..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-64 transition-all"
+                                    className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full transition-all text-black font-semibold"
                                 />
                             </div>
 
