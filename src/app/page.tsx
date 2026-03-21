@@ -5,12 +5,13 @@ import {
     Search, Activity, RefreshCw, LayoutList, LayoutGrid, Plus, Users, 
     ArrowUpDown, ArrowUp, ArrowDown, FileText, Menu, X as CloseIcon,
     Stethoscope, Heart, Scissors, Brain, Sparkles, User, FlaskConical, 
-    Bone, HeartPulse, Microscope, Printer
+    Bone, HeartPulse, Microscope, Printer, Calendar as CalendarIcon
 } from "lucide-react";
 import Image from "next/image";
 import PatientModal from "@/components/PatientModal";
 import ReportModal from "@/components/ReportModal";
 import LgpdModal from "@/components/LgpdModal";
+import CalendarView from "@/components/CalendarView";
 import { Patient, PatientStatus } from "../types";
 import { getPatients } from "./actions";
 import { logLgpdConsentAction } from "./staff-actions";
@@ -27,7 +28,7 @@ export default function Dashboard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [viewMode, setViewMode] = useState<"lista" | "kanban">("lista");
+    const [viewMode, setViewMode] = useState<"lista" | "kanban" | "calendar">("lista");
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<PatientStatus[]>([]);
     const [utiFilter, setUtiFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos');
@@ -174,10 +175,10 @@ export default function Dashboard() {
         
         return [
             { label: "(TODOS)", type: 'Todas' as PatientStatus | 'Todas', count: base.length, utiCount: base.filter(p => p.needsICU === 'Sim').length, color: "text-white", bg: "bg-[#0a1f44]", border: 'border-blue-900', isSummary: true },
-            { label: "SEM STATUS", type: 'SEM STATUS' as PatientStatus, count: base.filter(p => p.status === 'SEM STATUS').length, utiCount: base.filter(p => p.status === 'SEM STATUS' && p.needsICU === 'Sim').length, color: "text-slate-800", bg: "bg-slate-50", border: 'border-slate-300' },
             { label: "AGENDADOS", type: 'AGENDADOS' as PatientStatus, count: base.filter(p => p.status === 'AGENDADOS').length, utiCount: base.filter(p => p.status === 'AGENDADOS' && p.needsICU === 'Sim').length, color: "text-blue-600", bg: "bg-blue-50", border: 'border-blue-400' },
-            { label: "OBSERVAÇÕES/PENDÊNCIAS", type: 'OBSERVAÇÕES/PENDÊNCIAS' as PatientStatus, count: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS').length, utiCount: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS' && p.needsICU === 'Sim').length, color: "text-rose-600", bg: "bg-rose-50", border: 'border-rose-400' },
             { label: "PRONTOS", type: 'PRONTOS' as PatientStatus, count: base.filter(p => p.status === 'PRONTOS').length, utiCount: base.filter(p => p.status === 'PRONTOS' && p.needsICU === 'Sim').length, color: "text-emerald-600", bg: "bg-emerald-50", border: 'border-emerald-400' },
+            { label: "OBSERVAÇÕES\nPENDÊNCIAS", type: 'OBSERVAÇÕES/PENDÊNCIAS' as PatientStatus, count: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS').length, utiCount: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS' && p.needsICU === 'Sim').length, color: "text-rose-600", bg: "bg-rose-50", border: 'border-rose-400' },
+            { label: "SEM STATUS", type: 'SEM STATUS' as PatientStatus, count: base.filter(p => p.status === 'SEM STATUS').length, utiCount: base.filter(p => p.status === 'SEM STATUS' && p.needsICU === 'Sim').length, color: "text-slate-800", bg: "bg-slate-50", border: 'border-slate-300' },
             { label: "CIRURGIA REALIZADA", type: 'CIRURGIA REALIZADA' as PatientStatus, count: base.filter(p => p.status === 'CIRURGIA REALIZADA').length, utiCount: base.filter(p => p.status === 'CIRURGIA REALIZADA' && p.needsICU === 'Sim').length, color: "text-orange-500", bg: "bg-orange-50", border: 'border-orange-400' },
             { label: "PERDA DE SEGMENTO", type: 'PERDA DE SEGMENTO' as PatientStatus, count: base.filter(p => p.status === 'PERDA DE SEGMENTO').length, utiCount: base.filter(p => p.status === 'PERDA DE SEGMENTO' && p.needsICU === 'Sim').length, color: "text-[#78350f]", bg: "bg-[#fef3c7]", border: 'border-[#78350f]' },
         ];
@@ -469,6 +470,15 @@ const renderDate = (dateStr: string | undefined) => {
                                     <LayoutGrid size={14} />
                                     <span>Kanban</span>
                                 </button>
+                                <button 
+                                    onClick={() => setViewMode("calendar")}
+                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        viewMode === "calendar" ? "bg-[#0a1f44] text-white shadow-md" : "text-slate-500 hover:text-slate-700"
+                                    }`}
+                                >
+                                    <CalendarIcon size={14} />
+                                    <span>Calendário</span>
+                                </button>
                             </div>
                         </div>
 
@@ -510,10 +520,10 @@ const renderDate = (dateStr: string | undefined) => {
                                         (isSelected ? stat.border + ' ' + stat.bg + ' ring-4 ring-slate-200/50' : "bg-white border-transparent")
                                     }`}
                                 >
-                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'CIRURGIA REALIZADA' ? 'text-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'text-[#78350f]' : stat.label === 'PRONTOS' ? 'text-emerald-600' : stat.label === 'OBSERVAÇÕES/PENDÊNCIAS' ? 'text-rose-600' : 'text-slate-900')}`}>{stat.count}</span>
+                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'CIRURGIA REALIZADA' ? 'text-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'text-[#78350f]' : stat.label === 'PRONTOS' ? 'text-emerald-600' : stat.label.includes('OBSERVAÇÕES') ? 'text-rose-600' : 'text-slate-900')}`}>{stat.count}</span>
                                     <div className="flex items-center gap-1 sm:gap-2">
-                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${stat.label === 'CIRURGIA REALIZADA' ? 'bg-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'bg-[#78350f]' : stat.label === 'PRONTOS' ? 'bg-emerald-500' : stat.label === 'OBSERVAÇÕES/PENDÊNCIAS' ? 'bg-rose-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
-                                        <span className={`text-[7px] sm:text-[8px] lg:text-[10px] font-bold uppercase tracking-wider ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
+                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${stat.label === 'CIRURGIA REALIZADA' ? 'bg-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'bg-[#78350f]' : stat.label === 'PRONTOS' ? 'bg-emerald-500' : stat.label.includes('OBSERVAÇÕES') ? 'bg-rose-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
+                                        <span className={`text-[7px] sm:text-[8px] lg:text-[10px] font-bold uppercase tracking-wider whitespace-pre-line leading-tight ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
                                     </div>
                                 </div>
                             );
@@ -521,7 +531,9 @@ const renderDate = (dateStr: string | undefined) => {
                     </div>
 
                     {/* Table View (Desktop) / Card View (Mobile) */}
-                    {viewMode === "lista" ? (
+                    {viewMode === "calendar" ? (
+                        <CalendarView patients={filteredPatients} onPatientClick={(p) => { setSelectedPatient(p); setIsModalOpen(true); }} />
+                    ) : viewMode === "lista" ? (
                         <>
                             {/* Desktop Table */}
                             <div className="hidden lg:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
