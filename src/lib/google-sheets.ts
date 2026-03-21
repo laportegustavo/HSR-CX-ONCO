@@ -89,6 +89,9 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
             auxiliaryResidents: (function() { try { return JSON.parse(row[23] || '[]'); } catch { return []; } })(),
             observations: row[24] || '',
             lastUpdatedBy: row[25] || undefined,
+            hospital: row[26] || undefined,
+            operatingRoom: row[27] || undefined,
+            surgeryTime: row[28] || undefined,
             };
         });
     } catch (error) {
@@ -129,16 +132,19 @@ export async function savePatientsToSheet(patients: Patient[]): Promise<void> {
             p.city || '',
             JSON.stringify(p.auxiliaryResidents || []),
             p.observations || '',
-            p.lastUpdatedBy || ''
+            p.lastUpdatedBy || '',
+            p.hospital || '',
+            p.operatingRoom || '',
+            p.surgeryTime || ''
         ]);
 
         // Cabeçalho
-        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES", "LAST_UPDATED_BY"];
+        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES", "LAST_UPDATED_BY", "HOSPITAL", "SALA", "HORARIO"];
         
         // Limpar a aba toda e escrever os novos (para manter integridade como o .csv fazia)
         await sheets.spreadsheets.values.clear({
             spreadsheetId,
-            range: 'Pacientes!A:Z'
+            range: 'Pacientes!A:AC'
         });
 
         await sheets.spreadsheets.values.update({
@@ -230,7 +236,7 @@ export async function saveStaffToSheet(staffList: MedicalStaff[]): Promise<void>
 // CONFIGURAÇÕES (Aba Configuracoes)
 // ========================
 
-export async function getConfigFromSheet(): Promise<{ teams: string[], systems: string[] }> {
+export async function getConfigFromSheet(): Promise<{ teams: string[], systems: string[], hospitals: string[] }> {
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
@@ -241,9 +247,9 @@ export async function getConfigFromSheet(): Promise<{ teams: string[], systems: 
         });
 
         const rows = response.data.values;
-        if (!rows || rows.length === 0) return { teams: [], systems: [] };
+        if (!rows || rows.length === 0) return { teams: [], systems: [], hospitals: [] };
 
-        const config = { teams: [] as string[], systems: [] as string[] };
+        const config = { teams: [] as string[], systems: [] as string[], hospitals: [] as string[] };
         
         rows.forEach(row => {
             const key = row[0];
@@ -252,24 +258,29 @@ export async function getConfigFromSheet(): Promise<{ teams: string[], systems: 
             
             if (key === 'TEAMS') config.teams = list;
             if (key === 'SYSTEMS') config.systems = list;
+            if (key === 'HOSPITALS') config.hospitals = list;
         });
 
+        if (config.hospitals.length === 0) {
+            config.hospitals = ['BC MEZANINO', 'HCSA', 'HDVS CCA', 'HDVS TX', 'HNT', 'HSF', 'HSJ', 'HSR', 'MULTICENTRO', 'PPF', 'PSC'];
+        }
         return config;
     } catch (error) {
         console.error('Erro ao buscar configuracoes:', error);
         // Default genérico para caso ainda não tenha preenchido
-        return { teams: [], systems: [] };
+        return { teams: ['Geral', 'Oncologia'], systems: ['SUS', 'Convênio'], hospitals: ['BC MEZANINO', 'HCSA', 'HDVS CCA', 'HDVS TX', 'HNT', 'HSF', 'HSJ', 'HSR', 'MULTICENTRO', 'PPF', 'PSC'] };
     }
 }
 
-export async function saveConfigToSheet(config: { teams: string[], systems: string[] }): Promise<void> {
+export async function saveConfigToSheet(config: { teams: string[], systems: string[], hospitals?: string[] }): Promise<void> {
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
 
         const values = [
             ["TEAMS", JSON.stringify(config.teams)],
-            ["SYSTEMS", JSON.stringify(config.systems)]
+            ["SYSTEMS", JSON.stringify(config.systems)],
+            ['HOSPITALS', JSON.stringify(config.hospitals || ['BC MEZANINO', 'HCSA', 'HDVS CCA', 'HDVS TX', 'HNT', 'HSF', 'HSJ', 'HSR', 'MULTICENTRO', 'PPF', 'PSC'])]
         ];
 
         const header = ["CHAVE", "VALORES_JSON"];

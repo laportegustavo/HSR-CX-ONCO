@@ -22,6 +22,9 @@ const allColumns = [
     { key: 'resident', label: 'Residente' },
     { key: 'auxiliaryResidents', label: 'Residente Auxiliar' },
     { key: 'priority', label: 'Prioridade' },
+    { key: 'hospital', label: 'Local da Cirurgia' },
+    { key: 'operatingRoom', label: 'Sala' },
+    { key: 'surgeryTime', label: 'Horário' },
     { key: 'needsICU', label: 'UTI' },
     { key: 'contactPhone', label: 'Telefone' },
     { key: 'city', label: 'Cidade' },
@@ -40,7 +43,8 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
         status: [],
         sistema: [],
         team: [],
-        priority: []
+        priority: [],
+        hospital: []
     });
     const [activeFilterTab, setActiveFilterTab] = useState<string | null>(null);
 
@@ -53,6 +57,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
         status: (Array.from(new Set(patients.map(p => p.status).filter(Boolean))) as string[]).sort(),
         sistema: (Array.from(new Set(patients.map(p => p.sistema).filter(Boolean))) as string[]).sort(),
         team: (Array.from(new Set(patients.map(p => p.team).filter(Boolean))) as string[]).sort(),
+        hospital: (Array.from(new Set(patients.map(p => p.hospital).filter(Boolean))) as string[]).sort(),
         priority: ['1', '2', '3']
     };
 
@@ -82,6 +87,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
             if (filters.sistema.length > 0 && (!p.sistema || !filters.sistema.includes(p.sistema))) return false;
             if (filters.team.length > 0 && (!p.team || !filters.team.includes(p.team))) return false;
             if (filters.priority.length > 0 && (!p.priority || !filters.priority.includes(p.priority))) return false;
+            if (filters.hospital.length > 0 && (!p.hospital || !filters.hospital.includes(p.hospital))) return false;
             return true;
         });
 
@@ -230,6 +236,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                                 { key: 'status', label: 'Status' },
                                 { key: 'sistema', label: 'Sistema' },
                                 { key: 'team', label: 'Equipe' },
+                                { key: 'hospital', label: 'Local da Cirurgia' },
                                 { key: 'priority', label: 'Prioridade' }
                             ].map(category => (
                                 <div key={category.key} className="relative group">

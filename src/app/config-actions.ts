@@ -130,3 +130,55 @@ export async function updateSystemAction(oldName: string, newName: string) {
         return { success: false, error: 'Erro ao atualizar o sistema' };
     }
 }
+
+export async function addHospitalAction(hospital: string) {
+    const config = await getConfig();
+    if (!config.hospitals) config.hospitals = [];
+    if (!config.hospitals.includes(hospital)) {
+        config.hospitals.push(hospital);
+        await saveConfigAction(config);
+    }
+    return { success: true };
+}
+
+export async function deleteHospitalAction(hospital: string) {
+    const config = await getConfig();
+    if (config.hospitals) {
+        config.hospitals = config.hospitals.filter((h: string) => h !== hospital);
+        await saveConfigAction(config);
+    }
+    return { success: true };
+}
+
+export async function updateHospitalAction(oldName: string, newName: string) {
+    try {
+        const config = await getConfig();
+        if (!config.hospitals) config.hospitals = [];
+        const index = config.hospitals.indexOf(oldName);
+        
+        if (index !== -1) {
+            config.hospitals[index] = newName;
+            await saveConfigAction(config);
+
+            const patients = await getPatientsFromSheet();
+            let changedPatients = false;
+            
+            const updatedPatients = patients.map(p => {
+                if (p.hospital === oldName) {
+                    changedPatients = true;
+                    return { ...p, hospital: newName };
+                }
+                return p;
+            });
+
+            if (changedPatients) {
+                await savePatientsToSheet(updatedPatients);
+            }
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Error in updateHospitalAction:', error);
+        return { success: false, error: 'Erro ao atualizar o hospital' };
+    }
+}

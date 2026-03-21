@@ -21,6 +21,9 @@ export interface Patient {
   caseDiscussion?: string; // discussão do caso
   contactPhone: string; // telefone de contato
   city?: string; // cidade
+  hospital?: string; // Local da cirurgia
+  operatingRoom?: string; // Sala cirurgica
+  surgeryTime?: string; // Horário da cirurgia
   auxiliaryResidents?: string[]; // residentes auxiliares
   observations?: string; // observações / pendências
   preAnestheticEval: string; // avaliacao pre-anestesica

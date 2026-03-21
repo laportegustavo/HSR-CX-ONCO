@@ -10,16 +10,17 @@ import {
 import { MedicalStaff, Patient } from '@/types';
 import { getStaff, saveStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
 import { getPatients, deletePatientAction } from '../actions';
-import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction } from '../config-actions';
+import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction, addHospitalAction, deleteHospitalAction, updateHospitalAction } from '../config-actions';
 import PatientModal from '@/components/PatientModal';
 import Image from 'next/image';
 
 export default function AdminDashboard() {
     const [staff, setStaff] = useState<MedicalStaff[]>([]);
-    const [config, setConfig] = useState<{ teams: string[], systems: string[] }>({ teams: [], systems: [] });
+    const [config, setConfig] = useState<{ teams: string[], systems: string[], hospitals: string[] }>({ teams: [], systems: [], hospitals: [] });
     const [loading, setLoading] = useState(true);
     const [newTeam, setNewTeam] = useState("");
     const [newSystem, setNewSystem] = useState("");
+    const [newHospital, setNewHospital] = useState("");
     const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos'>('staff');
     const [patients, setPatients] = useState<Patient[]>([]);
     const [accessLogs, setAccessLogs] = useState<{ timestamp: string, username: string, role: string }[]>([]);
@@ -38,13 +39,15 @@ export default function AdminDashboard() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingTeam, setEditingTeam] = useState<string | null>(null);
     const [editingSystem, setEditingSystem] = useState<string | null>(null);
+    const [editingHospital, setEditingHospital] = useState<string | null>(null);
     const [editValue, setEditValue] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
     const [staffSort, setStaffSort] = useState<{ key: keyof MedicalStaff, dir: 'asc' | 'desc' }>({ key: 'systemName', dir: 'asc' });
     const [patientSort, setPatientSort] = useState<{ key: keyof Patient, dir: 'asc' | 'desc' }>({ key: 'name', dir: 'asc' });
     const [teamSortDir, setTeamSortDir] = useState<'asc' | 'desc'>('asc');
     const [systemSortDir, setSystemSortDir] = useState<'asc' | 'desc'>('asc');
-    const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'staff' | 'patient' | 'team' | 'system' } | null>(null);
+    const [hospitalSortDir, setHospitalSortDir] = useState<'asc' | 'desc'>('asc');
+    const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'staff' | 'patient' | 'team' | 'system' | 'hospital' } | null>(null);
     const router = useRouter();
 
     const fetchData = async () => {
@@ -150,6 +153,18 @@ export default function AdminDashboard() {
         setItemToDelete({ id: system, name: system, type: 'system' });
     };
 
+    const handleAddHospital = async () => {
+        if (newHospital.trim()) {
+            await addHospitalAction(newHospital.trim());
+            setNewHospital("");
+            fetchData();
+        }
+    };
+
+    const handleDeleteHospital = (hospital: string) => {
+        setItemToDelete({ id: hospital, name: hospital, type: 'hospital' });
+    };
+
     const handleEdit = (member: MedicalStaff) => {
         setFormData({
             fullName: member.fullName,
@@ -186,6 +201,8 @@ export default function AdminDashboard() {
                 await deleteTeamAction(itemToDelete.name);
             } else if (itemToDelete.type === 'system') {
                 await deleteSystemAction(itemToDelete.name);
+            } else if (itemToDelete.type === 'hospital') {
+                await deleteHospitalAction(itemToDelete.name);
             }
             await fetchData();
             setItemToDelete(null);
@@ -241,6 +258,29 @@ export default function AdminDashboard() {
             } catch (error) {
                 console.error("Client: Error updating system:", error);
                 alert("Erro ao atualizar sistema. Verifique os logs.");
+            } finally {
+                setIsUpdating(false);
+            }
+        }
+    };
+
+    const handleUpdateHospital = async (oldName: string) => {
+        if (!editValue || editValue === oldName) {
+            setEditingHospital(null);
+            return;
+        }
+        if (confirm(`Alterar nome do Local de "${oldName}" para "${editValue}"? Isso atualizará todos os pacientes com este Local.`)) {
+            setIsUpdating(true);
+            try {
+                await updateHospitalAction(oldName, editValue);
+                setEditingHospital(null);
+                setEditValue("");
+                await fetchData();
+                alert("Local atualizado com sucesso!");
+                window.location.reload();
+            } catch (error) {
+                console.error("Error updating hospital:", error);
+                alert("Erro ao atualizar local.");
             } finally {
                 setIsUpdating(false);
             }
@@ -729,6 +769,20 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-6"><Layers className="text-indigo-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Novo Local (Hospital)</h2></div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            title="Nome do local"
+                                            type="text" 
+                                            placeholder="Local da Cirurgia" 
+                                            value={newHospital} 
+                                            onChange={(e) => setNewHospital(e.target.value.toUpperCase())} 
+                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 text-black rounded-lg outline-none" 
+                                        />
+                                        <button onClick={handleAddHospital} title="Adicionar Local" className="bg-emerald-600 text-white p-2.5 rounded-lg"><Plus size={20} /></button>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                     <div className="flex items-center gap-2 mb-6"><Layers className="text-indigo-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Novo Sistema</h2></div>
                                     <div className="flex gap-2">
                                         <input 
@@ -743,7 +797,7 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="lg:col-span-2 grid grid-cols-1 xl:grid-cols-2 gap-8">
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                                     <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
                                         Equipes Ativas
@@ -845,6 +899,61 @@ export default function AdminDashboard() {
                                                                 <Save size={14} className="opacity-70" />
                                                             </button>
                                                             <button onClick={() => handleDeleteSystem(system)} title="Excluir sistema" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="p-6 border-b font-bold text-slate-800 bg-emerald-50 flex items-center justify-between">
+                                        Locais de Cirurgia
+                                        <button 
+                                            onClick={() => setHospitalSortDir(hospitalSortDir === 'asc' ? 'desc' : 'asc')}
+                                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+                                            title="Ordenar Locais"
+                                        >
+                                            {hospitalSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                                        </button>
+                                    </div>
+                                    <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                                        {config.hospitals && [...config.hospitals].sort((a, b) => hospitalSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(hospital => (
+                                            <div key={hospital} className="p-4 flex justify-between items-center hover:bg-slate-50 group">
+                                                {editingHospital === hospital ? (
+                                                    <div className="flex gap-2 w-full">
+                                                        <input 
+                                                            autoFocus
+                                                            type="text" 
+                                                            value={editValue} 
+                                                            onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+                                                            title="Editar nome do Local"
+                                                            placeholder="DIGITE O NOVO LOCAL"
+                                                            className="flex-1 p-1.5 bg-white border border-emerald-400 text-slate-800 rounded outline-none text-sm font-bold"
+                                                            disabled={isUpdating}
+                                                        />
+                                                        <button 
+                                                            onClick={() => handleUpdateHospital(hospital)} 
+                                                            disabled={isUpdating}
+                                                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase disabled:opacity-50"
+                                                        >
+                                                            {isUpdating ? "Salvando..." : "Salvar"}
+                                                        </button>
+                                                        <button onClick={() => setEditingHospital(null)} className="text-slate-400 hover:text-slate-500 font-bold text-xs uppercase">X</button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-sm font-bold text-slate-700">{hospital}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button 
+                                                                onClick={() => { setEditingHospital(hospital); setEditValue(hospital); }} 
+                                                                className="p-1.5 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded transition-all opacity-0 group-hover:opacity-100"
+                                                                title="Editar local"
+                                                            >
+                                                                <Save size={14} className="opacity-70" />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteHospital(hospital)} title="Excluir local" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
                                                         </div>
                                                     </>
                                                 )}

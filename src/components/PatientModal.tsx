@@ -49,7 +49,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
     const [formData, setFormData] = useState<Patient | null>(null);
     const [uploading, setUploading] = useState(false);
     const [staff, setStaff] = useState<MedicalStaff[]>([]);
-    const [config, setConfig] = useState<{ teams: string[], systems: string[] }>({ teams: [], systems: [] });
+    const [config, setConfig] = useState<{ teams: string[], systems: string[], hospitals: string[] }>({ teams: [], systems: [], hospitals: [] });
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
     useEffect(() => {
@@ -197,15 +197,15 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                             {patient ? "Editar Paciente" : "Novo Paciente"}
                         </h2>
-                        {patient && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {patient.id}</p>}
-                    </div>
-                    {patient && patient.lastUpdatedBy && (
-                        <div className="hidden sm:block text-right mr-4">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
-                                Última Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
-                            </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            {patient && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {patient.id}</p>}
+                            {patient && patient.lastUpdatedBy && (
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">
+                                    Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                                </p>
+                            )}
                         </div>
-                    )}
+                    </div>
                     <button
                         onClick={onClose}
                         className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all p-2 bg-slate-50"
@@ -218,14 +218,6 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                 {/* Form Content */}
                 <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50">
                     <form id="patient-form" onSubmit={handleSubmit} className="space-y-5">
-                    
-                        {patient && patient.lastUpdatedBy && (
-                            <div className="sm:hidden mb-4 bg-blue-50 rounded-xl p-3 border border-blue-100">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 leading-tight">
-                                    Última Modificação: <br/>{new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
-                                </p>
-                            </div>
-                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* NOME */}
                             <div className="space-y-1.5">
@@ -531,6 +523,50 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                                         placeholder="DD/MM/AAAA"
                                         value={formData.surgeryDate || ''}
                                         onChange={handleDateChange}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium bg-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* HORARIO CIRURGIA */}
+                            <div className="space-y-2">
+                                <label htmlFor="surgeryTime" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Horário da Cirurgia</label>
+                                <input
+                                    type="time"
+                                    id="surgeryTime"
+                                    name="surgeryTime"
+                                    value={formData.surgeryTime || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium bg-white"
+                                />
+                            </div>
+
+                            {/* HOSPITAL E SALA */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:col-span-2">
+                                <div className="space-y-2">
+                                    <label htmlFor="hospital" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Local da Cirurgia</label>
+                                    <select
+                                        id="hospital"
+                                        name="hospital"
+                                        value={formData.hospital || ''}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium bg-white appearance-none"
+                                    >
+                                        <option value="">Selecione um local</option>
+                                        {(config.hospitals || []).sort((a, b) => a.localeCompare(b)).map(h => (
+                                            <option key={h} value={h}>{h}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label htmlFor="operatingRoom" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Sala Cirúrgica</label>
+                                    <input
+                                        type="text"
+                                        id="operatingRoom"
+                                        name="operatingRoom"
+                                        value={formData.operatingRoom || ''}
+                                        onChange={handleChange}
+                                        placeholder="Ex: Sala 04"
                                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium bg-white"
                                     />
                                 </div>

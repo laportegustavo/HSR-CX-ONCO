@@ -68,9 +68,34 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
         <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] mb-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-black text-slate-800 tracking-tight capitalize">
-                        {startOfWeek.toFormat("LLLL yyyy", { locale: 'pt-BR' })}
-                    </h2>
+                    <div className="flex items-center gap-1 mr-2">
+                        <select 
+                            value={startOfWeek.month}
+                            onChange={(e) => setCurrentDate(curr => curr.set({ month: parseInt(e.target.value) }))}
+                            className="bg-transparent text-lg font-black text-slate-800 tracking-tight capitalize outline-none cursor-pointer hover:bg-slate-200 rounded px-1 py-0.5 -ml-1 transition-colors appearance-none"
+                            title="Selecionar Mês"
+                        >
+                            {Array.from({ length: 12 }, (_, i) => {
+                                const m = i + 1;
+                                return (
+                                    <option key={m} value={m}>
+                                        {DateTime.local(2000, m).toFormat('LLLL', { locale: 'pt-BR' })}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                        <select 
+                            value={startOfWeek.year}
+                            onChange={(e) => setCurrentDate(curr => curr.set({ year: parseInt(e.target.value) }))}
+                            className="bg-transparent text-lg font-black text-slate-800 tracking-tight outline-none cursor-pointer hover:bg-slate-200 rounded px-1 py-0.5 transition-colors appearance-none"
+                            title="Selecionar Ano"
+                        >
+                            {Array.from({ length: 10 }, (_, i) => {
+                                const y = DateTime.now().year - 3 + i;
+                                return <option key={y} value={y}>{y}</option>;
+                            })}
+                        </select>
+                    </div>
                     <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm p-1 gap-1">
                         <button onClick={handlePrevWeek} title="Semana Anterior" className="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors">
                             <ChevronLeft size={18} />
@@ -147,7 +172,9 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                                 </p>
                                                 <div className="flex flex-col gap-0.5 mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">
                                                     <span>EQ: {patient.team}</span>
-                                                    <span className={`${aih ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                    {patient.surgeryTime && <span className="text-blue-600">🕚 {patient.surgeryTime}</span>}
+                                                    {patient.hospital && <span className="text-indigo-600">🏥 {patient.hospital} {patient.operatingRoom ? `(${patient.operatingRoom})` : ''}</span>}
+                                                    <span className={`${aih ? 'text-emerald-600' : 'text-rose-500'} mt-0.5`}>
                                                         {aih ? `AIH: ${patient.aihDate}` : 'SEM AIH'}
                                                     </span>
                                                 </div>
