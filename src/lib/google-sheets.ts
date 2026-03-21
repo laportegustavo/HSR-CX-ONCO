@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Patient, PatientStatus, MedicalStaff } from '@/types';
+import { unstable_noStore as noStore } from 'next/cache';
 
 // Essa função autentica com a Google Cloud Usando a Service Account
 const getAuth = () => {
@@ -43,6 +44,7 @@ const getSpreadsheetId = () => {
 // ========================
 
 export async function getPatientsFromSheet(): Promise<Patient[]> {
+    noStore(); // Força Vercel a nunca fazer cache desta requisição
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
