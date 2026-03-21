@@ -201,10 +201,15 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                             {patient && (
                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                                     ID: {patient.id}
-                                    {patient.lastUpdatedBy && (
+                                    {patient.lastUpdatedBy ? (
                                         <>
                                             <span className="mx-2">•</span>
                                             Última Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="mx-2">•</span>
+                                            Última Modificação: Sem Registro Escrito
                                         </>
                                     )}
                                 </p>
