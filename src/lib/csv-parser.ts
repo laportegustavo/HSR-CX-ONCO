@@ -52,9 +52,9 @@ export async function parsePatientsFromCSV(): Promise<Patient[]> {
                 if (statusRaw.includes('PRONTOS')) {
                     status = 'PRONTOS';
                 } else if (statusRaw.includes('PENDENCIA') || statusRaw.includes('PENDÊNCIA') || statusRaw.includes('PENDÊNCIAS')) {
-                    status = 'PENDÊNCIAS';
+                    status = 'OBSERVAÇÕES/PENDÊNCIAS';
                 } else if (statusRaw.includes('OBSERVAÇÕES') || statusRaw.includes('OBSERVAÇÃO')) {
-                    status = 'OBSERVAÇÕES';
+                    status = 'OBSERVAÇÕES/PENDÊNCIAS';
                 } else if (statusRaw.includes('AGENDADOS')) {
                     status = 'AGENDADOS';
                 } else if (statusRaw.includes('REALIZADA') || statusRaw.includes('CONCLUIDA')) {

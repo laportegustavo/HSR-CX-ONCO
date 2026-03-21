@@ -57,11 +57,16 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
         const rows = response.data.values;
         if (!rows || rows.length === 0) return [];
 
-        return rows.map((row) => ({
+        return rows.map((row) => {
+            let parsedStatus = row[3] as string || 'SEM STATUS';
+            if (parsedStatus === 'OBSERVAÇÕES' || parsedStatus === 'PENDÊNCIAS') {
+                parsedStatus = 'OBSERVAÇÕES/PENDÊNCIAS';
+            }
+            return {
             id: row[0] || '',
             name: row[1] || '',
             team: row[2] || '',
-            status: (row[3] as PatientStatus) || 'SEM STATUS',
+            status: parsedStatus as PatientStatus,
             sistema: row[4] || '',
             medicalRecord: row[5] || '',
             aihDate: row[6] || '',
@@ -83,7 +88,8 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
             city: row[22] || '',
             auxiliaryResidents: (function() { try { return JSON.parse(row[23] || '[]'); } catch { return []; } })(),
             observations: row[24] || '',
-        }));
+            };
+        });
     } catch (error) {
         console.error('Erro ao buscar pacientes:', error);
         return []; // Retorna lista vazia em vez de quebrar a página inicial

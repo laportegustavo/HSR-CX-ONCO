@@ -1,7 +1,6 @@
 export type PatientStatus = 
   | 'PRONTOS'
-  | 'PENDÊNCIAS'
-  | 'OBSERVAÇÕES'
+  | 'OBSERVAÇÕES/PENDÊNCIAS'
   | 'AGENDADOS'
   | 'CIRURGIA REALIZADA'
   | 'PERDA DE SEGMENTO'

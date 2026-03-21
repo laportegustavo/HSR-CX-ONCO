@@ -39,8 +39,7 @@ const defaultPatient: Patient = {
 const statusOptions: PatientStatus[] = [
     "AGENDADOS",
     "CIRURGIA REALIZADA",
-    "OBSERVAÇÕES",
-    "PENDÊNCIAS",
+    "OBSERVAÇÕES/PENDÊNCIAS",
     "PERDA DE SEGMENTO",
     "PRONTOS",
     "SEM STATUS"
