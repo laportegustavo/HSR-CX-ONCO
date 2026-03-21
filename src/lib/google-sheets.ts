@@ -276,3 +276,58 @@ export async function saveConfigToSheet(config: { teams: string[], systems: stri
         throw error;
     }
 }
+
+// ========================
+// ACESSOS (Aba Acessos)
+// ========================
+
+export async function getAccessLogs(): Promise<{ timestamp: string, username: string, role: string }[]> {
+    noStore();
+    try {
+        const sheets = getSheets();
+        const spreadsheetId = getSpreadsheetId();
+
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'Acessos!A2:C',
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) return [];
+
+        return rows.map((row) => ({
+            timestamp: row[0] || '',
+            username: row[1] || '',
+            role: row[2] || '',
+        })).reverse(); // Mais recentes primeiro
+    } catch (error) {
+        console.error('Erro ao buscar logs de acesso:', error);
+        return [];
+    }
+}
+
+export async function logAccess(username: string, role: string): Promise<void> {
+    try {
+        const sheets = getSheets();
+        const spreadsheetId = getSpreadsheetId();
+        
+        // Data e hora no fuso horário do Brasil
+        const now = new Date();
+        const timestamp = new Intl.DateTimeFormat('pt-BR', { 
+            dateStyle: 'short', 
+            timeStyle: 'medium',
+            timeZone: 'America/Sao_Paulo' 
+        }).format(now);
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'Acessos!A:C',
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [[timestamp, username, role]],
+            },
+        });
+    } catch (error) {
+        console.error('Erro ao registrar log de acesso. Verifique se a aba "Acessos" existe no Sheets:', error);
+    }
+}

@@ -1,7 +1,7 @@
 'use server';
 
 import { MedicalStaff } from '../types';
-import { getStaffFromSheet, saveStaffToSheet } from '../lib/google-sheets';
+import { getStaffFromSheet, saveStaffToSheet, logAccess, getAccessLogs } from '../lib/google-sheets';
 
 export async function getStaff(): Promise<MedicalStaff[]> {
     return await getStaffFromSheet();
@@ -63,6 +63,7 @@ export async function validateLoginAction(username: string, password: string, ro
     );
     
     if (user) {
+        logAccess(user.systemName || user.fullName, role).catch(console.error);
         return { success: true, user: { id: user.id, fullName: user.fullName, role: role } };
     }
     
@@ -113,4 +114,8 @@ export async function recoverPasswordAction(username: string, role: string) {
         success: true, 
         message: `Uma nova senha foi enviada para o e-mail: ${targetEmail.replace(/(.{3}).*(@.*)/, '$1***$2')}`
     };
+}
+
+export async function getAccessLogsAction(): Promise<{ timestamp: string, username: string, role: string }[]> {
+    return await getAccessLogs();
 }

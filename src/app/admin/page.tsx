@@ -8,7 +8,7 @@ import {
     Layers, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { MedicalStaff, Patient } from '@/types';
-import { getStaff, saveStaffAction, deleteStaffAction } from '../staff-actions';
+import { getStaff, saveStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
 import { getPatients, deletePatientAction } from '../actions';
 import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction } from '../config-actions';
 import PatientModal from '@/components/PatientModal';
@@ -20,8 +20,9 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [newTeam, setNewTeam] = useState("");
     const [newSystem, setNewSystem] = useState("");
-    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients'>('staff');
+    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos'>('staff');
     const [patients, setPatients] = useState<Patient[]>([]);
+    const [accessLogs, setAccessLogs] = useState<{ timestamp: string, username: string, role: string }[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
     const [formData, setFormData] = useState<Omit<MedicalStaff, 'id'>>({
@@ -49,14 +50,16 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [staffData, configData, patientsData] = await Promise.all([
+            const [staffData, configData, patientsData, logsData] = await Promise.all([
                 getStaff(), 
                 getConfig(),
-                getPatients()
+                getPatients(),
+                getAccessLogsAction()
             ]);
             setStaff(staffData);
             setConfig(configData);
             setPatients(patientsData);
+            setAccessLogs(logsData);
         } catch (error) {
             console.error("Error fetching data:", error);
         }
@@ -338,6 +341,13 @@ export default function AdminDashboard() {
                         className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'config' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
                     >
                         Configurações Gerais
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('acessos')}
+                        title="Visualizar Acessos dos Usuários"
+                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'acessos' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        Registro de Acessos
                     </button>
                 </div>
 
@@ -645,6 +655,49 @@ export default function AdminDashboard() {
                                                             >
                                                                 <Trash2 size={18} />
                                                             </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    ) : activeTab === 'acessos' ? (
+                        <div className="lg:col-span-3">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
+                                    Histórico de Acessos Recentes
+                                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{accessLogs.length} REGISTROS</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                            <tr>
+                                                <th className="px-6 py-4">Data e Hora</th>
+                                                <th className="px-6 py-4">Usuário</th>
+                                                <th className="px-6 py-4">Nível de Acesso</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {loading ? (
+                                                <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr>
+                                            ) : accessLogs.length === 0 ? (
+                                                <tr><td colSpan={3} className="p-12 text-center text-slate-500">Nenhum registro encontrado na aba &quot;Acessos&quot;. O primeiro login criará as colunas.</td></tr>
+                                            ) : (
+                                                accessLogs.map((log, i) => (
+                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
+                                                        <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                                log.role === 'Administrador' ? 'bg-slate-800 text-white' :
+                                                                log.role === 'Médico Preceptor' ? 'bg-indigo-100 text-indigo-700' :
+                                                                'bg-emerald-100 text-emerald-700'
+                                                            }`}>
+                                                                {log.role}
+                                                            </span>
                                                         </td>
                                                     </tr>
                                                 ))
