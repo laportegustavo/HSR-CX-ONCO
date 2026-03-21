@@ -120,6 +120,24 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
         });
 
         const sortedData = [...filteredData].sort((a, b) => {
+            if (sortKey === 'surgeryDate' || sortKey === 'aihDate') {
+                const parseDateStr = (d: string | undefined | null) => {
+                    if (!d || d === '--') return 0;
+                    if (d.includes('/')) {
+                        const parts = d.split('/');
+                        if (parts.length === 3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00`).getTime();
+                    } else if (d.includes('-')) {
+                        return new Date(`${d}T12:00:00`).getTime();
+                    }
+                    return 0;
+                };
+                const aTime = parseDateStr(a[sortKey] as string);
+                const bTime = parseDateStr(b[sortKey] as string);
+                if (aTime < bTime) return sortDir === 'asc' ? -1 : 1;
+                if (aTime > bTime) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+            }
+
             const aVal = String(a[sortKey] || "");
             const bVal = String(b[sortKey] || "");
             if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
