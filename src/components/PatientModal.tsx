@@ -129,9 +129,27 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
         }
     };
 
+    const isValidDate = (dateString: string) => {
+        if (!dateString) return true; // Allow empty if the field itself is optional (like surgeryDate)
+        const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+        if (!regex.test(dateString)) return false;
+        const [day, month, year] = dateString.split('/').map(Number);
+        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2100) return false;
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (formData) {
+            if (formData.aihDate && !isValidDate(formData.aihDate)) {
+                alert("Data de AIH inválida. Utilize o formato completo: DD/MM/AAAA.");
+                return;
+            }
+            if (formData.surgeryDate && !isValidDate(formData.surgeryDate)) {
+                alert("Data da Cirurgia inválida. Utilize o formato completo: DD/MM/AAAA.");
+                return;
+            }
+            
             try {
                 if (formData.id) {
                     await updatePatientAction(formData);
