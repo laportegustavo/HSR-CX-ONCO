@@ -32,6 +32,7 @@ export interface Patient {
   latexAllergy?: 'Sim' | 'Não'; // alergia a latex
   jehovahsWitness?: 'Sim' | 'Não'; // testemunha de jeova
   lastUpdated?: string;
+  lastUpdatedBy?: string;
 }
 
 export interface MedicalStaff {

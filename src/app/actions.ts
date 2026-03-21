@@ -2,8 +2,9 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { getPatientsFromSheet, savePatientsToSheet } from '../lib/google-sheets';
+import { getPatientsFromSheet, savePatientsToSheet, logAccess } from '../lib/google-sheets';
 import { Patient } from '../types';
+import { cookies } from 'next/headers';
 
 export async function getPatients() {
     return await getPatientsFromSheet();
@@ -13,14 +14,23 @@ export async function createPatientAction(patient: Omit<Patient, 'id'>) {
     console.log('Create requested for:', patient.name);
     try {
         const patients = await getPatientsFromSheet();
+        const cookieStore = await cookies();
+        const userName = cookieStore.get('username')?.value || 'Desconhecido';
+        const decodedName = decodeURIComponent(userName);
+
         const newPatient: Patient = {
             ...patient,
             id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            lastUpdatedBy: decodedName
         };
         
         const updatedPatients = [...patients, newPatient];
         await savePatientsToSheet(updatedPatients);
+        
+        // Registrar log de auditoria
+        await logAccess(decodedName, `CRIOU PACIENTE: ${newPatient.name}`).catch(console.error);
+        
         
         return { success: true, patient: newPatient };
     } catch (error) {
@@ -33,11 +43,18 @@ export async function updatePatientAction(patient: Patient) {
     console.log('Update requested for:', patient.name);
     try {
         const patients = await getPatientsFromSheet();
+        const cookieStore = await cookies();
+        const userName = cookieStore.get('username')?.value || 'Desconhecido';
+        const decodedName = decodeURIComponent(userName);
+
         const updatedPatients = patients.map(p => 
-            p.id === patient.id ? { ...patient, lastUpdated: new Date().toISOString() } : p
+            p.id === patient.id ? { ...patient, lastUpdated: new Date().toISOString(), lastUpdatedBy: decodedName } : p
         );
         
         await savePatientsToSheet(updatedPatients);
+        
+        // Registrar log de auditoria
+        await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name}`).catch(console.error);
         return { success: true };
     } catch (error) {
         console.error('Erro ao atualizar paciente no Google Sheets:', error);
@@ -53,6 +70,12 @@ export async function deletePatientAction(patientId: string) {
         
         // We do NOT re-index their IDs anymore since they are unique identifiers now
         await savePatientsToSheet(updatedPatients);
+
+        const cookieStore = await cookies();
+        const userName = cookieStore.get('username')?.value || 'Desconhecido';
+        const decodedName = decodeURIComponent(userName);
+        await logAccess(decodedName, `EXCLUIU PACIENTE ID: ${patientId}`).catch(console.error);
+
         return { success: true };
     } catch (error) {
         console.error('Delete Error no Google Sheets:', error);

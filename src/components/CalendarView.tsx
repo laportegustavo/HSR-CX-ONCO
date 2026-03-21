@@ -22,7 +22,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
 
     const surgeries = (() => {
         return patients.filter(p => {
-            if (!p.surgeryDate || p.surgeryDate === '--') return false;
+            if (!p.surgeryDate || typeof p.surgeryDate !== 'string' || p.surgeryDate === '--') return false;
             
             const parts = p.surgeryDate.split('/');
             if (parts.length === 3) {
@@ -46,7 +46,8 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
 
     const getSurgeriesForDate = (date: DateTime) => {
         return surgeries.filter(p => {
-            const parts = p.surgeryDate!.split('/');
+            if (!p.surgeryDate || typeof p.surgeryDate !== 'string') return false;
+            const parts = p.surgeryDate.split('/');
             if (parts.length === 3) {
                 return parseInt(parts[0], 10) === date.day && parseInt(parts[1], 10) === date.month && parseInt(parts[2], 10) === date.year;
             } else if (p.surgeryDate!.includes('-')) {
@@ -57,8 +58,8 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
         });
     };
 
-    const hasAIH = (aihDate?: string) => {
-        return aihDate && aihDate !== '--' && aihDate !== '00/00/0000' && aihDate.trim() !== '';
+    const hasAIH = (aihDate?: string | null) => {
+        return typeof aihDate === 'string' && aihDate !== '--' && aihDate !== '00/00/0000' && aihDate.trim() !== '';
     };
 
     return (

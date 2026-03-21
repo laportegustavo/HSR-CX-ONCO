@@ -134,7 +134,8 @@ export default function Dashboard() {
     const filteredPatients = useMemo(() => {
         const result = patients.filter((p) => {
             const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.medicalRecord.includes(searchTerm);
+                p.medicalRecord.includes(searchTerm) ||
+                (p.city && p.city.toLowerCase().includes(searchTerm.toLowerCase()));
             const matchesTeam = selectedTeams.length === 0 || selectedTeams.includes(p.team);
             const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(p.status);
             const matchesUti = utiFilter === 'Todos' || p.needsICU === utiFilter;

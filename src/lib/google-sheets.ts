@@ -88,6 +88,7 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
             city: row[22] || '',
             auxiliaryResidents: (function() { try { return JSON.parse(row[23] || '[]'); } catch { return []; } })(),
             observations: row[24] || '',
+            lastUpdatedBy: row[25] || undefined,
             };
         });
     } catch (error) {
@@ -127,16 +128,17 @@ export async function savePatientsToSheet(patients: Patient[]): Promise<void> {
             p.cpf || '',
             p.city || '',
             JSON.stringify(p.auxiliaryResidents || []),
-            p.observations || ''
+            p.observations || '',
+            p.lastUpdatedBy || ''
         ]);
 
-        // Cabeçaho
-        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES"];
+        // Cabeçalho
+        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES", "LAST_UPDATED_BY"];
         
         // Limpar a aba toda e escrever os novos (para manter integridade como o .csv fazia)
         await sheets.spreadsheets.values.clear({
             spreadsheetId,
-            range: 'Pacientes!A:Y'
+            range: 'Pacientes!A:Z'
         });
 
         await sheets.spreadsheets.values.update({

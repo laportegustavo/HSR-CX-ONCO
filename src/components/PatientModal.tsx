@@ -199,6 +199,13 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                         </h2>
                         {patient && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {patient.id}</p>}
                     </div>
+                    {patient && patient.lastUpdatedBy && (
+                        <div className="hidden sm:block text-right mr-4">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                                Última Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                            </span>
+                        </div>
+                    )}
                     <button
                         onClick={onClose}
                         className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all p-2 bg-slate-50"
@@ -211,6 +218,14 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                 {/* Form Content */}
                 <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50">
                     <form id="patient-form" onSubmit={handleSubmit} className="space-y-5">
+                    
+                        {patient && patient.lastUpdatedBy && (
+                            <div className="sm:hidden mb-4 bg-blue-50 rounded-xl p-3 border border-blue-100">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 leading-tight">
+                                    Última Modificação: <br/>{new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                                </p>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* NOME */}
                             <div className="space-y-1.5">

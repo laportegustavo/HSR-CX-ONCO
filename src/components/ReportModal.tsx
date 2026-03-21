@@ -24,6 +24,7 @@ const allColumns = [
     { key: 'priority', label: 'Prioridade' },
     { key: 'needsICU', label: 'UTI' },
     { key: 'contactPhone', label: 'Telefone' },
+    { key: 'city', label: 'Cidade' },
     { key: 'waitTime', label: 'Tempo de Espera (Dias)' },
 ];
 
