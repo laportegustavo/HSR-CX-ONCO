@@ -3,8 +3,13 @@ import { Patient, PatientStatus, MedicalStaff } from '@/types';
 
 // Essa função autentica com a Google Cloud Usando a Service Account
 const getAuth = () => {
-    const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '');
-    const private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
+    const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '').trim();
+    let private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '').trim();
+
+    // Auto-fix se o usuário copiou apenas o meio da chave e cortou o cabeçalho (comum ao usar 2 cliques)
+    if (private_key && !private_key.includes('BEGIN PRIVATE KEY')) {
+        private_key = `-----BEGIN PRIVATE KEY-----\n${private_key}\n-----END PRIVATE KEY-----\n`;
+    }
 
     const credentials = {
         client_email,

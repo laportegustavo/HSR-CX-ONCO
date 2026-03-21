@@ -6,9 +6,13 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '');
-        const private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
-        const spreadsheetId = process.env.GOOGLE_SHEET_ID?.replace(/^"|"$/g, '');
+        const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '').trim();
+        let private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '').trim();
+        const spreadsheetId = process.env.GOOGLE_SHEET_ID?.replace(/^"|"$/g, '').trim();
+
+        if (private_key && !private_key.includes('BEGIN PRIVATE KEY')) {
+            private_key = `-----BEGIN PRIVATE KEY-----\n${private_key}\n-----END PRIVATE KEY-----\n`;
+        }
 
         if (!client_email || !private_key || !spreadsheetId) {
             throw new Error(`Valores faltantes: Email: ${!!client_email}, Key: ${!!private_key}, ID: ${!!spreadsheetId}`);
