@@ -51,7 +51,7 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
 
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Pacientes!A2:Y', // Até a coluna Y (25 colunas)
+            range: 'Pacientes!A2:AC', // Até a coluna AC (29 colunas)
         });
 
         const rows = response.data.values;
