@@ -33,6 +33,8 @@ const allColumns = [
 
 export default function ReportModal({ patients, isOpen, onClose }: ReportModalProps) {
     const [selectedColumns, setSelectedColumns] = useState<string[]>(['status', 'team', 'name', 'surgeryDate', 'needsICU']);
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
     const [sortKey, setSortKey] = useState<keyof Patient>('name');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -80,6 +82,32 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
 
     const handlePrint = () => {
         const filteredData = patients.filter(p => {
+            if (startDate || endDate) {
+                if (!p.surgeryDate || p.surgeryDate === '--') return false;
+                
+                let d: Date | null = null;
+                if (p.surgeryDate.includes('/')) {
+                    const parts = p.surgeryDate.split('/');
+                    if (parts.length === 3) {
+                        d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00`);
+                    }
+                } else if (p.surgeryDate.includes('-')) {
+                    d = new Date(`${p.surgeryDate}T12:00:00`);
+                }
+                
+                if (d && !isNaN(d.getTime())) {
+                    if (startDate) {
+                        const s = new Date(`${startDate}T00:00:00`);
+                        if (d < s) return false;
+                    }
+                    if (endDate) {
+                        const e = new Date(`${endDate}T23:59:59`);
+                        if (d > e) return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
             if (filters.preceptor.length > 0 && (!p.preceptor || !filters.preceptor.includes(p.preceptor))) return false;
             if (filters.resident.length > 0 && (!p.resident || !filters.resident.includes(p.resident))) return false;
             if (filters.auxiliaryResidents.length > 0 && (!p.auxiliaryResidents || !p.auxiliaryResidents.some(r => filters.auxiliaryResidents.includes(r)))) return false;
