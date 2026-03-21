@@ -20,6 +20,9 @@ export interface Patient {
   clinicalData: string; // dados clinicos
   caseDiscussion?: string; // discussão do caso
   contactPhone: string; // telefone de contato
+  city?: string; // cidade
+  auxiliaryResidents?: string[]; // residentes auxiliares
+  observations?: string; // observações / pendências
   preAnestheticEval: string; // avaliacao pre-anestesica
   examPdfPath?: string; // Path to the exam PDF
   status: PatientStatus;

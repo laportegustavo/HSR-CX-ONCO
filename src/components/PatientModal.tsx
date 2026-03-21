@@ -24,6 +24,9 @@ const defaultPatient: Patient = {
     sistema: '',
     clinicalData: '',
     contactPhone: '',
+    city: '',
+    auxiliaryResidents: [],
+    observations: '',
     preAnestheticEval: '',
     status: 'SEM STATUS',
     priority: '3',
@@ -237,13 +240,27 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                             <div className="space-y-2">
                                 <label htmlFor="contactPhone" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Telefone de Contato</label>
                                 <input
-                                    type="tel"
+                                    type="text"
                                     id="contactPhone"
                                     name="contactPhone"
                                     value={formData.contactPhone}
                                     onChange={handleChange}
                                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium"
-                                    placeholder="(00) 00000-0000"
+                                    placeholder="Ex: (00) 00000-0000 ou Recado"
+                                />
+                            </div>
+
+                            {/* CIDADE */}
+                            <div className="space-y-2">
+                                <label htmlFor="city" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Cidade</label>
+                                <input
+                                    type="text"
+                                    id="city"
+                                    name="city"
+                                    value={formData.city || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium"
+                                    placeholder="Ex: Porto Alegre"
                                 />
                             </div>
 
@@ -361,11 +378,25 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                                 <textarea
                                     id="clinicalData"
                                     name="clinicalData"
-                                    rows={5}
+                                    rows={3}
                                     value={formData.clinicalData}
                                     onChange={handleChange}
                                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium resize-none shadow-sm"
                                     placeholder="Descreva o caso ou use o leitor OCR acima..."
+                                />
+                            </div>
+
+                            {/* OBSERVACOES E PENDENCIAS */}
+                            <div className="space-y-2 md:col-span-2">
+                                <label htmlFor="observations" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Observações / Pendências</label>
+                                <textarea
+                                    id="observations"
+                                    name="observations"
+                                    rows={2}
+                                    value={formData.observations || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium resize-none shadow-sm"
+                                    placeholder="Anotações adicionais e pendências..."
                                 />
                             </div>
 
@@ -474,7 +505,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
 
                             {/* RESIDENTE */}
                             <div className="space-y-2">
-                                <label htmlFor="resident" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Médico Residente</label>
+                                <label htmlFor="resident" className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Médico Residente Principal</label>
                                 <select
                                     id="resident"
                                     name="resident"
@@ -482,11 +513,41 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                                     onChange={handleChange}
                                     className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all text-slate-900 font-medium bg-white appearance-none"
                                 >
-                                    <option value="">Selecione um residente</option>
+                                    <option value="">Selecione um residente principal</option>
                                     {staff.filter(s => s.type === 'resident').sort((a, b) => a.systemName.localeCompare(b.systemName)).map(s => (
                                         <option key={s.id} value={s.systemName}>{s.systemName}</option>
                                     ))}
                                 </select>
+                            </div>
+                            
+                            {/* RESIDENTE AUXILIAR */}
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Residentes Auxiliares</label>
+                                <div className="w-full max-h-32 overflow-y-auto px-4 py-2 border border-slate-200 rounded-xl bg-white space-y-2">
+                                    {staff.filter(s => s.type === 'resident').sort((a, b) => a.systemName.localeCompare(b.systemName)).map(s => {
+                                        const isSelected = (formData.auxiliaryResidents || []).includes(s.systemName);
+                                        return (
+                                            <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        const current = formData.auxiliaryResidents || [];
+                                                        const newArr = isSelected 
+                                                            ? current.filter((r: string) => r !== s.systemName) 
+                                                            : [...current, s.systemName];
+                                                        setFormData(prev => prev ? { ...prev, auxiliaryResidents: newArr } : null);
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-slate-700">{s.systemName}</span>
+                                            </label>
+                                        );
+                                    })}
+                                    {staff.filter(s => s.type === 'resident').length === 0 && (
+                                        <p className="text-xs text-slate-400 italic">Nenhum residente cadastrado.</p>
+                                    )}
+                                </div>
                             </div>
 
                         </div>

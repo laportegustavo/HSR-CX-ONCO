@@ -20,6 +20,7 @@ const allColumns = [
     { key: 'aihDate', label: 'Data AIH' },
     { key: 'surgeryDate', label: 'Data Cirurgia' },
     { key: 'resident', label: 'Residente' },
+    { key: 'auxiliaryResidents', label: 'Residente Auxiliar' },
     { key: 'priority', label: 'Prioridade' },
     { key: 'needsICU', label: 'UTI' },
     { key: 'contactPhone', label: 'Telefone' },
@@ -34,6 +35,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
     const [filters, setFilters] = useState<Record<string, string[]>>({
         preceptor: [],
         resident: [],
+        auxiliaryResidents: [],
         status: [],
         sistema: [],
         team: [],
@@ -46,6 +48,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
     const uniqueOptions = {
         preceptor: (Array.from(new Set(patients.map(p => p.preceptor).filter(Boolean))) as string[]).sort(),
         resident: (Array.from(new Set(patients.map(p => p.resident).filter(Boolean))) as string[]).sort(),
+        auxiliaryResidents: (Array.from(new Set(patients.flatMap(p => p.auxiliaryResidents || []))).filter(Boolean) as string[]).sort(),
         status: (Array.from(new Set(patients.map(p => p.status).filter(Boolean))) as string[]).sort(),
         sistema: (Array.from(new Set(patients.map(p => p.sistema).filter(Boolean))) as string[]).sort(),
         team: (Array.from(new Set(patients.map(p => p.team).filter(Boolean))) as string[]).sort(),
@@ -73,6 +76,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
         const filteredData = patients.filter(p => {
             if (filters.preceptor.length > 0 && (!p.preceptor || !filters.preceptor.includes(p.preceptor))) return false;
             if (filters.resident.length > 0 && (!p.resident || !filters.resident.includes(p.resident))) return false;
+            if (filters.auxiliaryResidents.length > 0 && (!p.auxiliaryResidents || !p.auxiliaryResidents.some(r => filters.auxiliaryResidents.includes(r)))) return false;
             if (filters.status.length > 0 && (!p.status || !filters.status.includes(p.status))) return false;
             if (filters.sistema.length > 0 && (!p.sistema || !filters.sistema.includes(p.sistema))) return false;
             if (filters.team.length > 0 && (!p.team || !filters.team.includes(p.team))) return false;
@@ -150,6 +154,9 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                                             if (c.key === 'waitTime') {
                                                 return `<td>${calculateWait(p.aihDate || '', p.surgeryDate || '')}</td>`;
                                             }
+                                            if (c.key === 'auxiliaryResidents') {
+                                                return `<td>${(p.auxiliaryResidents || []).join(', ') || '--'}</td>`;
+                                            }
                                             return `<td>${p[c.key as keyof Patient] || '--'}</td>`;
                                         }).join('')}
                                     </tr>
@@ -218,6 +225,7 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                             {[
                                 { key: 'preceptor', label: 'Preceptor' },
                                 { key: 'resident', label: 'Residente' },
+                                { key: 'auxiliaryResidents', label: 'Res. Auxiliar' },
                                 { key: 'status', label: 'Status' },
                                 { key: 'sistema', label: 'Sistema' },
                                 { key: 'team', label: 'Equipe' },

@@ -51,7 +51,7 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
 
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Pacientes!A2:V', // Até a coluna V (22 colunas)
+            range: 'Pacientes!A2:Y', // Até a coluna Y (25 colunas)
         });
 
         const rows = response.data.values;
@@ -80,6 +80,9 @@ export async function getPatientsFromSheet(): Promise<Patient[]> {
             examPdfPath: row[19] || undefined,
             lastUpdated: row[20] || new Date().toISOString(),
             cpf: row[21] || '',
+            city: row[22] || '',
+            auxiliaryResidents: (function() { try { return JSON.parse(row[23] || '[]'); } catch { return []; } })(),
+            observations: row[24] || '',
         }));
     } catch (error) {
         console.error('Erro ao buscar pacientes:', error);
@@ -115,16 +118,19 @@ export async function savePatientsToSheet(patients: Patient[]): Promise<void> {
             p.jehovahsWitness || 'Não',
             p.examPdfPath || '',
             p.lastUpdated || new Date().toISOString(),
-            p.cpf || ''
+            p.cpf || '',
+            p.city || '',
+            JSON.stringify(p.auxiliaryResidents || []),
+            p.observations || ''
         ]);
 
         // Cabeçaho
-        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF"];
+        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES"];
         
         // Limpar a aba toda e escrever os novos (para manter integridade como o .csv fazia)
         await sheets.spreadsheets.values.clear({
             spreadsheetId,
-            range: 'Pacientes!A:V'
+            range: 'Pacientes!A:Y'
         });
 
         await sheets.spreadsheets.values.update({
