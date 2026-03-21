@@ -3,9 +3,12 @@ import { Patient, PatientStatus, MedicalStaff } from '@/types';
 
 // Essa função autentica com a Google Cloud Usando a Service Account
 const getAuth = () => {
+    const client_email = process.env.GOOGLE_CLIENT_EMAIL?.replace(/^"|"$/g, '');
+    const private_key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n').replace(/^"|"$/g, '');
+
     const credentials = {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email,
+        private_key,
     };
 
     return new google.auth.GoogleAuth({
@@ -20,7 +23,8 @@ const getSheets = () => {
 };
 
 const getSpreadsheetId = () => {
-    const id = process.env.GOOGLE_SHEET_ID;
+    let id = process.env.GOOGLE_SHEET_ID;
+    if (id) id = id.replace(/^"|"$/g, '');
     if (!id) throw new Error("Pendente configuração do Google Sheets (GOOGLE_SHEET_ID ausente no .env)");
     return id;
 };
