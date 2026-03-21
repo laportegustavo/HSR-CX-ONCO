@@ -278,8 +278,9 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Inicial</label>
+                                <label htmlFor="startDate" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Inicial</label>
                                 <input 
+                                    id="startDate"
                                     type="date" 
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
@@ -287,8 +288,9 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Final</label>
+                                <label htmlFor="endDate" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Data Final</label>
                                 <input 
+                                    id="endDate"
                                     type="date" 
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
