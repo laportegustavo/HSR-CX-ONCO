@@ -30,6 +30,8 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                 const month = parseInt(parts[1], 10);
                 const year = parseInt(parts[2], 10);
                 
+                if (isNaN(day) || isNaN(month) || isNaN(year) || month < 1 || month > 12 || day < 1 || day > 31) return false;
+
                 const date = DateTime.fromObject({ year, month, day }, { zone: 'America/Sao_Paulo' });
                 if (date.isValid && date >= startOfWeek && date <= startOfWeek.plus({ days: 6 }).endOf("day")) {
                     return true;

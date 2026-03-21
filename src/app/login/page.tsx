@@ -279,7 +279,7 @@ export default function LoginPage() {
                     <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-blue-500/20 uppercase tracking-widest">
                         <span>Segurança SSL</span>
                         <div className="w-1 h-1 bg-current rounded-full" />
-                        <span>v2.4.0 (2025)</span>
+                        <span>v2.5.0 (2026) - Atualizado em 21/03/2026 12:15</span>
                     </div>
                 </div>
             </div>
