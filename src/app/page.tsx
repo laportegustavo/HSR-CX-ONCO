@@ -651,7 +651,10 @@ const renderDate = (dateStr: string | undefined) => {
                         </>
                     ) : (
                         <div className="flex gap-6 overflow-x-auto pb-4 h-full min-h-[500px]">
-                            {["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIA", "PRONTOS", "CIRURGIA REALIZADA"].map((status) => (
+                            {(selectedStatuses.length > 0
+                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA"].filter(s => selectedStatuses.includes(s as PatientStatus))
+                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES", "PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA"]
+                            ).map((status) => (
                                 <div 
                                     key={status} 
                                     onDragOver={handleDragOver}
