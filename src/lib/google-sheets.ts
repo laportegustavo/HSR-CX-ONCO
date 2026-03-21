@@ -141,10 +141,11 @@ export async function savePatientsToSheet(patients: Patient[]): Promise<void> {
 
 
 // ========================
-// EQUIPE MÉDICA (Aba Equipe)
+// FUNÇÕES DE EQUIPE
 // ========================
 
 export async function getStaffFromSheet(): Promise<MedicalStaff[]> {
+    noStore(); // Força Vercel a nunca fazer cache desta requisição
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
