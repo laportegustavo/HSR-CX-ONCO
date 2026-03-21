@@ -196,12 +196,16 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                     <div>
                         <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                             {patient ? "Editar Paciente" : "Novo Paciente"}
-                        </h2>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            {patient && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {patient.id}</p>}
-                            {patient && patient.lastUpdatedBy && (
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">
-                                    Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {patient && (
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                    ID: {patient.id}
+                                    {patient.lastUpdatedBy && (
+                                        <>
+                                            <span className="mx-2">•</span>
+                                            Última Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
+                                        </>
+                                    )}
                                 </p>
                             )}
                         </div>
