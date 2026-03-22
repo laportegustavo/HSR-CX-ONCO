@@ -11,7 +11,7 @@ interface CalendarViewProps {
 }
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 07:00 to 21:00
-const HOUR_HEIGHT = 50;
+const HOUR_HEIGHT = 40;
 
 export default function CalendarView({ patients, onPatientClick }: CalendarViewProps) {
     const [currentDate, setCurrentDate] = useState(() => DateTime.now().setZone('America/Sao_Paulo'));
@@ -70,7 +70,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
     };
 
     return (
-        <div className="flex flex-col h-[650px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
+        <div className="flex flex-col h-[600px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-5 border-b border-slate-100 bg-white gap-4">
                 <div className="flex items-center gap-4">
@@ -147,10 +147,12 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                         {/* Time labels column */}
                         <div className="col-span-1 border-r border-slate-100 bg-white/80 backdrop-blur-sm sticky left-0 z-10">
                             {HOURS.map((hour) => (
-                                <div key={hour} className="relative border-b border-slate-50" style={{ height: HOUR_HEIGHT }}>
-                                    <span className="absolute -top-2.5 right-3 text-[10px] font-black text-slate-400 tabular-nums">
-                                        {hour.toString().padStart(2, '0')}:00
-                                    </span>
+                                <div key={hour} className={`relative ${hour % 2 === 0 ? 'border-b border-slate-100' : 'border-b border-slate-50/50'}`} style={{ height: HOUR_HEIGHT }}>
+                                    {hour % 2 === 1 && (
+                                        <span className="absolute -top-2.5 right-3 text-[10px] font-black text-slate-400 tabular-nums">
+                                            {hour.toString().padStart(2, '0')}:00
+                                        </span>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -164,12 +166,12 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                 <div key={dayIdx} className={`relative border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/5' : ''}`}>
                                     {/* Hour background lines */}
                                     {HOURS.map((h) => (
-                                        <div key={h} className="border-b border-slate-50" style={{ height: HOUR_HEIGHT }}></div>
+                                        <div key={h} className={`${h % 2 === 0 ? 'border-b border-slate-100' : 'border-b border-slate-50/50'}`} style={{ height: HOUR_HEIGHT }}></div>
                                     ))}
 
                                     {/* Medical Surgery Cards */}
                                     {daySurgeries.map((patient) => {
-                                        const top = getTimeOffset(patient.surgeryTime) ?? (20 + (daySurgeries.indexOf(patient) * 55));
+                                        const top = getTimeOffset(patient.surgeryTime) ?? (10 + (daySurgeries.indexOf(patient) * 45));
                                         const aih = hasAIH(patient.aihDate);
                                         const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
                                         const isReady = patient.status === 'PRONTOS';
