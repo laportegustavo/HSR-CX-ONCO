@@ -11,7 +11,7 @@ interface CalendarViewProps {
 }
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 07:00 to 21:00
-const HOUR_HEIGHT = 80;
+const HOUR_HEIGHT = 50;
 
 export default function CalendarView({ patients, onPatientClick }: CalendarViewProps) {
     const [currentDate, setCurrentDate] = useState(() => DateTime.now().setZone('America/Sao_Paulo'));
@@ -70,7 +70,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
     };
 
     return (
-        <div className="flex flex-col h-[800px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
+        <div className="flex flex-col h-[650px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-5 border-b border-slate-100 bg-white gap-4">
                 <div className="flex items-center gap-4">
@@ -169,7 +169,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
 
                                     {/* Medical Surgery Cards */}
                                     {daySurgeries.map((patient) => {
-                                        const top = getTimeOffset(patient.surgeryTime) ?? (20 + (daySurgeries.indexOf(patient) * 85));
+                                        const top = getTimeOffset(patient.surgeryTime) ?? (20 + (daySurgeries.indexOf(patient) * 55));
                                         const aih = hasAIH(patient.aihDate);
                                         const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
                                         const isReady = patient.status === 'PRONTOS';
@@ -178,7 +178,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                             <div 
                                                 key={patient.id}
                                                 onClick={() => onPatientClick(patient)}
-                                                className={`absolute left-1 right-1 p-2.5 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] hover:z-20 shadow-lg border-l-4 group ${
+                                                className={`absolute left-1 right-1 p-1.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:z-20 shadow-md border-l-4 group ${
                                                     isSurgeryDone 
                                                         ? 'bg-white border-l-orange-500 shadow-orange-100/30' 
                                                         : isReady 
@@ -187,7 +187,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                                 }`}
                                                 style={{ 
                                                     top,
-                                                    minHeight: '76px',
+                                                    minHeight: '46px',
                                                 }}
                                             >
                                                 <div className="flex flex-col h-full justify-between overflow-hidden">
