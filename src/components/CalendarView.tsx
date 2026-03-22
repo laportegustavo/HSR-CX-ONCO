@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { Patient } from "../types";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Stethoscope, Building2 } from "lucide-react";
 import { DateTime } from "luxon";
 
 interface CalendarViewProps {
     patients: Patient[];
     onPatientClick: (patient: Patient) => void;
 }
+
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 07:00 to 21:00
+const HOUR_HEIGHT = 80;
 
 export default function CalendarView({ patients, onPatientClick }: CalendarViewProps) {
     const [currentDate, setCurrentDate] = useState(() => DateTime.now().setZone('America/Sao_Paulo'));
@@ -20,163 +23,207 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
     const handleNextWeek = () => setCurrentDate(curr => curr.plus({ weeks: 1 }));
     const handleToday = () => setCurrentDate(DateTime.now().setZone('America/Sao_Paulo'));
 
-    const surgeries = (() => {
-        return patients.filter(p => {
-            if (!p.surgeryDate || typeof p.surgeryDate !== 'string' || p.surgeryDate === '--') return false;
-            
-            const parts = p.surgeryDate.split('/');
-            if (parts.length === 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10);
-                const year = parseInt(parts[2], 10);
-                
-                if (isNaN(day) || isNaN(month) || isNaN(year) || month < 1 || month > 12 || day < 1 || day > 31) return false;
-
-                const date = DateTime.fromObject({ year, month, day }, { zone: 'America/Sao_Paulo' });
-                if (date.isValid && date >= startOfWeek && date <= startOfWeek.plus({ days: 6 }).endOf("day")) {
-                    return true;
-                }
-            } else if (p.surgeryDate.includes('-')) {
-                const date = DateTime.fromISO(p.surgeryDate).setZone('America/Sao_Paulo');
-                if (date.isValid && date >= startOfWeek && date <= startOfWeek.plus({ days: 6 }).endOf("day")) {
-                    return true;
-                }
-            }
-            return false;
-        });
-    })();
+    const parseSurgeryDate = (dateStr: string | undefined): DateTime | null => {
+        if (!dateStr || dateStr === '--' || !dateStr.trim() || dateStr.toLowerCase().includes('pendente')) return null;
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/').map(Number);
+            if (parts.length !== 3 || parts.some(isNaN)) return null;
+            const [d, m, y] = parts;
+            return DateTime.fromObject({ year: y, month: m, day: d }, { zone: 'America/Sao_Paulo' });
+        }
+        const isoDate = DateTime.fromISO(dateStr).setZone('America/Sao_Paulo');
+        return isoDate.isValid ? isoDate : null;
+    };
 
     const getSurgeriesForDate = (date: DateTime) => {
-        return surgeries.filter(p => {
-            if (!p.surgeryDate || typeof p.surgeryDate !== 'string') return false;
-            const parts = p.surgeryDate.split('/');
-            if (parts.length === 3) {
-                return parseInt(parts[0], 10) === date.day && parseInt(parts[1], 10) === date.month && parseInt(parts[2], 10) === date.year;
-            } else if (p.surgeryDate!.includes('-')) {
-                 const pDate = DateTime.fromISO(p.surgeryDate!).setZone('America/Sao_Paulo');
-                 return pDate.hasSame(date, 'day');
-            }
-            return false;
+        return patients.filter(p => {
+            const pDate = parseSurgeryDate(p.surgeryDate);
+            return pDate && pDate.hasSame(date, 'day');
         });
+    };
+
+    const getTimeOffset = (timeStr?: string) => {
+        if (!timeStr || !timeStr.includes(':')) return null;
+        const parts = timeStr.split(':').map(Number);
+        if (parts.length < 1 || isNaN(parts[0])) return null;
+        
+        const hours = parts[0];
+        const minutes = parts[1] || 0;
+        
+        const startHour = HOURS[0];
+        const relativeHour = (hours + minutes / 60) - startHour;
+        
+        // Clamp to middle if outside range or return null
+        if (relativeHour < 0) return 10; 
+        if (relativeHour > HOURS.length) return (HOURS.length - 1) * HOUR_HEIGHT + 20;
+
+        return relativeHour * HOUR_HEIGHT;
+    };
+
+    const formatDate = (dateStr: string | undefined): string => {
+        const dt = parseSurgeryDate(dateStr);
+        return dt ? dt.toFormat('dd/MM/yyyy') : (dateStr || '--');
     };
 
     const hasAIH = (aihDate?: string | null) => {
-        return typeof aihDate === 'string' && aihDate !== '--' && aihDate !== '00/00/0000' && aihDate.trim() !== '';
+        return typeof aihDate === 'string' && aihDate !== '--' && aihDate !== '00/00/0000' && aihDate.trim() !== '' && !aihDate.toLowerCase().includes('pendente');
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] mb-8">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex flex-col h-[800px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-5 border-b border-slate-100 bg-white gap-4">
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1 mr-2">
+                    <div className="flex items-center gap-1 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-100">
                         <select 
-                            value={startOfWeek.month}
+                            value={currentDate.month}
                             onChange={(e) => setCurrentDate(curr => curr.set({ month: parseInt(e.target.value) }))}
-                            className="bg-transparent text-lg font-black text-slate-800 tracking-tight capitalize outline-none cursor-pointer hover:bg-slate-200 rounded px-1 py-0.5 -ml-1 transition-colors appearance-none"
+                            className="bg-transparent text-lg font-black text-slate-900 tracking-tight capitalize outline-none cursor-pointer hover:text-blue-600 transition-colors appearance-none"
                             title="Selecionar Mês"
                         >
-                            {Array.from({ length: 12 }, (_, i) => {
-                                const m = i + 1;
-                                return (
-                                    <option key={m} value={m}>
-                                        {DateTime.local(2000, m).toFormat('LLLL', { locale: 'pt-BR' })}
-                                    </option>
-                                );
-                            })}
+                            {Array.from({ length: 12 }, (_, i) => (
+                                <option key={i+1} value={i+1}>{DateTime.local(2000, i+1).toFormat('LLLL', { locale: 'pt-BR' })}</option>
+                            ))}
                         </select>
                         <select 
-                            value={startOfWeek.year}
+                            value={currentDate.year}
                             onChange={(e) => setCurrentDate(curr => curr.set({ year: parseInt(e.target.value) }))}
-                            className="bg-transparent text-lg font-black text-slate-800 tracking-tight outline-none cursor-pointer hover:bg-slate-200 rounded px-1 py-0.5 transition-colors appearance-none"
+                            className="bg-transparent text-lg font-black text-slate-900 tracking-tight outline-none cursor-pointer hover:text-blue-600 transition-colors appearance-none"
                             title="Selecionar Ano"
                         >
                             {Array.from({ length: 10 }, (_, i) => {
-                                const y = DateTime.now().year - 3 + i;
+                                const y = DateTime.now().year - 2 + i;
                                 return <option key={y} value={y}>{y}</option>;
                             })}
                         </select>
                     </div>
-                    <div className="flex items-center bg-white rounded-lg border border-slate-200 shadow-sm p-1 gap-1">
-                        <button onClick={handlePrevWeek} title="Semana Anterior" className="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors">
-                            <ChevronLeft size={18} />
+                    <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-1">
+                        <button onClick={handlePrevWeek} title="Anterior" className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition-all">
+                            <ChevronLeft size={20} strokeWidth={3} />
                         </button>
-                        <button onClick={handleToday} title="Ir para Hoje" className="px-3 py-1 hover:bg-slate-100 text-xs font-bold text-slate-600 uppercase tracking-widest rounded transition-colors">
+                        <button onClick={handleToday} className="px-4 py-1.5 hover:bg-white hover:shadow-sm text-xs font-black text-slate-700 uppercase tracking-widest rounded-lg transition-all">
                             Hoje
                         </button>
-                        <button onClick={handleNextWeek} title="Próxima Semana" className="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors">
-                            <ChevronRight size={18} />
+                        <button onClick={handleNextWeek} title="Próximo" className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition-all">
+                            <ChevronRight size={20} strokeWidth={3} />
                         </button>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase">
-                        <div className="w-2 h-2 rounded bg-emerald-500"></div> Prontos
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase">
-                        <div className="w-2 h-2 rounded bg-orange-500"></div> Cirurgia Realizada
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase">
-                        <div className="w-2 h-2 rounded bg-blue-500"></div> Outros
-                    </span>
+
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Prontos
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-orange-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Realizadas
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-x-auto">
-                <div className="min-w-[800px] h-full flex flex-col">
-                    <div className="grid grid-cols-7 border-b border-slate-200 shrink-0">
-                        {days.map((day, i) => {
-                            const isToday = day.hasSame(DateTime.now(), "day");
-                            return (
-                                <div key={i} className={`py-3 px-2 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                                    <p className={`text-[10px] font-black uppercase tracking-widest ${isToday ? 'text-blue-600' : 'text-slate-500'}`}>
-                                        {day.toFormat('ccc', { locale: 'pt-BR' })}
-                                    </p>
-                                    <div className={`mt-1 mx-auto w-8 h-8 flex items-center justify-center rounded-full text-lg font-bold ${
-                                        isToday ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'text-slate-700'
-                                    }`}>
-                                        {day.toFormat('d')}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+            {/* Calendar Body */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+                {/* Day Labels - Sticky */}
+                <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] border-b border-slate-100 bg-slate-50/30 sticky top-0 z-20">
+                    <div className="border-r border-slate-100"></div>
+                    {days.map((day, i) => {
+                        const isToday = day.hasSame(DateTime.now(), "day");
+                        return (
+                            <div key={i} className={`py-4 px-2 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
+                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                                    {day.toFormat('ccc', { locale: 'pt-BR' })}
+                                </p>
+                                <p className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-slate-700'}`}>
+                                    {day.toFormat('dd/MM/yyyy')}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
 
-                    <div className="flex-1 grid grid-cols-7 relative">
-                        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between opacity-10 py-2">
-                             {[...Array(12)].map((_, idx) => (
-                                 <div key={idx} className="border-t border-slate-400 w-full h-10" />
-                             ))}
+                {/* Timeline Grid Area */}
+                <div className="flex-1 overflow-y-auto no-scrollbar relative bg-slate-50/10">
+                    <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] min-h-full transition-all duration-500" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+                        
+                        {/* Time labels column */}
+                        <div className="col-span-1 border-r border-slate-100 bg-white/80 backdrop-blur-sm sticky left-0 z-10">
+                            {HOURS.map((hour) => (
+                                <div key={hour} className="relative border-b border-slate-50" style={{ height: HOUR_HEIGHT }}>
+                                    <span className="absolute -top-2.5 right-3 text-[10px] font-black text-slate-400 tabular-nums">
+                                        {hour.toString().padStart(2, '0')}:00
+                                    </span>
+                                </div>
+                            ))}
                         </div>
 
-                        {days.map((day, i) => {
+                        {/* Columns for each day */}
+                        {days.map((day, dayIdx) => {
                             const daySurgeries = getSurgeriesForDate(day);
                             const isToday = day.hasSame(DateTime.now(), "day");
+                            
                             return (
-                                <div key={i} className={`min-h-[400px] border-r border-slate-100 last:border-r-0 p-1.5 space-y-1.5 relative ${isToday ? 'bg-blue-50/10' : ''}`}>
+                                <div key={dayIdx} className={`relative border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/5' : ''}`}>
+                                    {/* Hour background lines */}
+                                    {HOURS.map((h) => (
+                                        <div key={h} className="border-b border-slate-50" style={{ height: HOUR_HEIGHT }}></div>
+                                    ))}
+
+                                    {/* Medical Surgery Cards */}
                                     {daySurgeries.map((patient) => {
+                                        const top = getTimeOffset(patient.surgeryTime) ?? (20 + (daySurgeries.indexOf(patient) * 85));
                                         const aih = hasAIH(patient.aihDate);
+                                        const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
+                                        const isReady = patient.status === 'PRONTOS';
+
                                         return (
                                             <div 
-                                                key={patient.id} 
+                                                key={patient.id}
                                                 onClick={() => onPatientClick(patient)}
-                                                className={`p-2 rounded-lg cursor-pointer transition-all hover:-translate-y-0.5 shadow-sm active:scale-95 border-l-4 relative z-10 ${
-                                                    patient.status === 'CIRURGIA REALIZADA' 
-                                                        ? 'bg-orange-50/90 border-l-orange-500 hover:shadow-orange-500/20' 
-                                                        : (patient.status === 'PRONTOS' 
-                                                            ? 'bg-emerald-50/90 border-l-emerald-500 hover:shadow-emerald-500/20' 
-                                                            : 'bg-blue-50/90 border-l-blue-500 hover:shadow-blue-500/20')
+                                                className={`absolute left-1 right-1 p-2.5 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] hover:z-20 shadow-lg border-l-4 group ${
+                                                    isSurgeryDone 
+                                                        ? 'bg-white border-l-orange-500 shadow-orange-100/30' 
+                                                        : isReady 
+                                                            ? 'bg-white border-l-emerald-500 shadow-emerald-100/30' 
+                                                            : 'bg-white border-l-blue-500 shadow-blue-100/30'
                                                 }`}
+                                                style={{ 
+                                                    top,
+                                                    minHeight: '76px',
+                                                }}
                                             >
-                                                <p className="text-[11px] font-black text-slate-800 leading-tight mb-1" title={patient.name}>
-                                                    {patient.name}
-                                                </p>
-                                                <div className="flex flex-col gap-0.5 mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                                                    <span>EQ: {patient.team}</span>
-                                                    {patient.surgeryTime && <span className="text-blue-600">🕚 {patient.surgeryTime}</span>}
-                                                    {patient.hospital && <span className="text-indigo-600">🏥 {patient.hospital} {patient.operatingRoom ? `(${patient.operatingRoom})` : ''}</span>}
-                                                    <span className={`${aih ? 'text-emerald-600' : 'text-rose-500'} mt-0.5`}>
-                                                        {aih ? `AIH: ${patient.aihDate}` : 'SEM AIH'}
-                                                    </span>
+                                                <div className="flex flex-col h-full justify-between overflow-hidden">
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1 gap-1">
+                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 border ${
+                                                                patient.sistema === 'SUS' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                            }`}>
+                                                                SISTEMA: {patient.sistema || 'SUS'}
+                                                            </span>
+                                                            {patient.surgeryTime && (
+                                                                <span className="text-[9px] font-black text-blue-600 flex items-center gap-1 shrink-0">
+                                                                    <Clock size={10} strokeWidth={3} /> {patient.surgeryTime}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-slate-900 leading-tight uppercase truncate">
+                                                            {patient.name}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="mt-1.5 space-y-1">
+                                                        <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500">
+                                                            <Stethoscope size={9} className="text-slate-400 shrink-0" />
+                                                            <span className="truncate">EQ: {patient.team}</span>
+                                                        </div>
+                                                        {(patient.hospital || patient.operatingRoom) && (
+                                                            <div className="flex items-center gap-1 text-[8px] font-bold text-slate-600">
+                                                                <Building2 size={9} className="text-slate-400 shrink-0" />
+                                                                <span className="truncate">{patient.hospital} {patient.operatingRoom ? `[S ${patient.operatingRoom}]` : ''}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className={`text-[8px] font-black uppercase tracking-tighter ${aih ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                            {aih ? `AIH: ${formatDate(patient.aihDate)}` : 'SEM AIH'}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
