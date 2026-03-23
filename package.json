@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.577.0",
     "luxon": "^3.7.2",

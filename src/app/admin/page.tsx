@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { 
     Users, UserPlus, Trash2, Save, ArrowLeft, 
     Stethoscope, ShieldCheck, Contact, Plus, UserCircle,
-    Layers, ArrowUp, ArrowDown
+    Layers, ArrowUp, ArrowDown, Settings2
 } from 'lucide-react';
 import { MedicalStaff, Patient } from '@/types';
 import { getStaff, saveStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
-import { getPatients, deletePatientAction } from '../actions';
+import { getPatients, deletePatientAction, getPatientChangeLogsAction } from '../actions';
 import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction, addHospitalAction, deleteHospitalAction, updateHospitalAction } from '../config-actions';
 import PatientModal from '@/components/PatientModal';
+import FieldManager from '@/components/FieldManager';
 import Image from 'next/image';
 
 export default function AdminDashboard() {
@@ -21,9 +22,11 @@ export default function AdminDashboard() {
     const [newTeam, setNewTeam] = useState("");
     const [newSystem, setNewSystem] = useState("");
     const [newHospital, setNewHospital] = useState("");
-    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos'>('staff');
+    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos' | 'fields'>('staff');
     const [patients, setPatients] = useState<Patient[]>([]);
     const [accessLogs, setAccessLogs] = useState<{ timestamp: string, username: string, role: string }[]>([]);
+    const [changeLogs, setChangeLogs] = useState<{ timestamp: string, user: string, patientId: string, patientName: string, field: string, oldValue: string, newValue: string }[]>([]);
+    const [auditSubTab, setAuditSubTab] = useState<'access' | 'changes'>('access');
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
     const [formData, setFormData] = useState<Omit<MedicalStaff, 'id'>>({
@@ -53,16 +56,18 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [staffData, configData, patientsData, logsData] = await Promise.all([
+            const [staffData, configData, patientsData, logsData, changeLogsData] = await Promise.all([
                 getStaff(), 
                 getConfig(),
                 getPatients(),
-                getAccessLogsAction()
+                getAccessLogsAction(),
+                getPatientChangeLogsAction()
             ]);
             setStaff(staffData);
             setConfig(configData);
             setPatients(patientsData);
             setAccessLogs(logsData);
+            setChangeLogs(changeLogsData);
         } catch (error) {
             console.error("Error fetching data:", error);
         }
@@ -382,12 +387,11 @@ export default function AdminDashboard() {
                     >
                         Configurações Gerais
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('acessos')}
-                        title="Visualizar Acessos dos Usuários"
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'acessos' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-                    >
-                        Registro de Acessos
+                    <button onClick={() => setActiveTab('acessos')} className={`flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'acessos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        <ShieldCheck size={16} /> Auditoria
+                    </button>
+                    <button onClick={() => setActiveTab('fields')} className={`flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'fields' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        <Settings2 size={16} /> Campos
                     </button>
                 </div>
 
@@ -704,51 +708,112 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         </div>
-                    ) : activeTab === 'acessos' ? (
+                    ) : activeTab === 'fields' ? (
                         <div className="lg:col-span-3">
+                            <FieldManager />
+                        </div>
+                    ) : activeTab === 'acessos' ? (
+                        <div className="lg:col-span-3 space-y-4">
+                            <div className="flex gap-2 mb-2">
+                                <button 
+                                    onClick={() => setAuditSubTab('access')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'access' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    Logins e Ações Gerais
+                                </button>
+                                <button 
+                                    onClick={() => setAuditSubTab('changes')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'changes' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    Alterações de Pacientes (Detalhado)
+                                </button>
+                            </div>
+
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
-                                    Histórico de Acessos Recentes
-                                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{accessLogs.length} REGISTROS</span>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
-                                            <tr>
-                                                <th className="px-6 py-4">Data e Hora</th>
-                                                <th className="px-6 py-4">Usuário</th>
-                                                <th className="px-6 py-4">Nível de Acesso</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {loading ? (
-                                                <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr>
-                                            ) : accessLogs.length === 0 ? (
-                                                <tr><td colSpan={3} className="p-12 text-center text-slate-500">Nenhum registro encontrado na aba &quot;Acessos&quot;. O primeiro login criará as colunas.</td></tr>
-                                            ) : (
-                                                accessLogs.map((log, i) => (
-                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
-                                                        <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
-                                                        <td className="px-6 py-4">
-                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                                log.role.includes('CRIOU PACIENTE') ? 'bg-emerald-100 text-emerald-700 font-bold border border-emerald-200' :
-                                                                log.role.includes('EDITOU PACIENTE') ? 'bg-amber-100 text-amber-700 font-bold border border-amber-200' :
-                                                                log.role.includes('EXCLUIU PACIENTE') ? 'bg-red-100 text-red-700 font-bold border border-red-200' :
-                                                                log.role === 'ACEITE LGPD' ? 'bg-rose-100 text-rose-700 font-black' :
-                                                                log.role === 'Administrador' ? 'bg-slate-800 text-white' :
-                                                                log.role === 'Médico Preceptor' ? 'bg-indigo-100 text-indigo-700' :
-                                                                'bg-emerald-100 text-emerald-700'
-                                                            }`}>
-                                                                {log.role}
-                                                            </span>
-                                                        </td>
+                                {auditSubTab === 'access' ? (
+                                    <>
+                                        <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
+                                            Histórico de Acessos e Ações
+                                            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{accessLogs.length} REGISTROS</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                                    <tr>
+                                                        <th className="px-6 py-4">Data e Hora</th>
+                                                        <th className="px-6 py-4">Usuário</th>
+                                                        <th className="px-6 py-4">Ação / Nível</th>
                                                     </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {loading ? (
+                                                        <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr>
+                                                    ) : accessLogs.length === 0 ? (
+                                                        <tr><td colSpan={3} className="p-12 text-center text-slate-500">Nenhum registro encontrado.</td></tr>
+                                                    ) : (
+                                                        accessLogs.map((log, i) => (
+                                                            <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
+                                                                <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
+                                                                <td className="px-6 py-4">
+                                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                                        log.role.includes('CRIOU PACIENTE') ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                                                                        log.role.includes('EDITOU PACIENTE') ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                                                                        log.role.includes('EXCLUIU PACIENTE') ? 'bg-red-100 text-red-700 border border-red-200' :
+                                                                        log.role === 'ACEITE LGPD' ? 'bg-rose-100 text-rose-700' :
+                                                                        log.role === 'Administrador' ? 'bg-slate-800 text-white' :
+                                                                        'bg-indigo-100 text-indigo-700'
+                                                                    }`}>
+                                                                        {log.role}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
+                                            Histórico Detalhado de Alterações
+                                            <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">{changeLogs.length} ALTERAÇÕES</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                                    <tr>
+                                                        <th className="px-6 py-4">Data/Hora</th>
+                                                        <th className="px-6 py-4">Usuário</th>
+                                                        <th className="px-6 py-4">Paciente</th>
+                                                        <th className="px-6 py-4">Campo</th>
+                                                        <th className="px-6 py-4">De</th>
+                                                        <th className="px-6 py-4">Para</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {loading ? (
+                                                        <tr><td colSpan={6} className="p-12 text-center">Carregando...</td></tr>
+                                                    ) : changeLogs.length === 0 ? (
+                                                        <tr><td colSpan={6} className="p-12 text-center text-slate-500">Nenhuma alteração detalhada registrada.</td></tr>
+                                                    ) : (
+                                                        changeLogs.map((log, i) => (
+                                                            <tr key={i} className="hover:bg-slate-50 transition-colors text-xs">
+                                                                <td className="px-6 py-4 font-mono text-slate-500 whitespace-nowrap">{log.timestamp}</td>
+                                                                <td className="px-6 py-4 font-bold text-slate-700">{log.user}</td>
+                                                                <td className="px-6 py-4 text-blue-600 font-semibold">{log.patientName}</td>
+                                                                <td className="px-6 py-4 uppercase font-bold text-[10px] text-slate-500">{log.field}</td>
+                                                                <td className="px-6 py-4 text-rose-500 line-through max-w-[150px] truncate" title={log.oldValue}>{log.oldValue || '-'}</td>
+                                                                <td className="px-6 py-4 text-emerald-600 font-bold max-w-[150px] truncate" title={log.newValue}>{log.newValue || '-'}</td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ) : (

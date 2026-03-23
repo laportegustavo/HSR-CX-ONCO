@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { Patient, PatientStatus, MedicalStaff } from '@/types';
+import { Patient, MedicalStaff, FieldSchema, FieldType } from '@/types';
 import { unstable_noStore as noStore } from 'next/cache';
 
 // Essa função autentica com a Google Cloud Usando a Service Account
@@ -27,76 +27,214 @@ const getAuth = () => {
     });
 };
 
-const getSheets = () => {
+export const getSheets = () => {
     const auth = getAuth();
     return google.sheets({ version: 'v4', auth });
 };
 
-const getSpreadsheetId = () => {
+export const getSpreadsheetId = () => {
     let id = process.env.GOOGLE_SHEET_ID;
     if (id) id = id.replace(/^"|"$/g, '');
     if (!id) throw new Error("Pendente configuração do Google Sheets (GOOGLE_SHEET_ID ausente no .env)");
     return id;
 };
 
+const getColumnLetter = (index: number): string => {
+    let letter = "";
+    while (index >= 0) {
+        letter = String.fromCharCode((index % 26) + 65) + letter;
+        index = Math.floor(index / 26) - 1;
+    }
+    return letter;
+};
+
+// ========================
+// ESQUEMA DE CAMPOS (Aba ConfigCampos)
+// ========================
+
+const INITIAL_SCHEMA: FieldSchema[] = [
+    { id: 'id', label: 'ID', type: 'text', column: 0, isVisibleInCalendar: false, isRequired: true, order: 0, isSystem: true },
+    { id: 'name', label: 'Nome do Paciente', type: 'text', column: 1, isVisibleInCalendar: true, isRequired: true, order: 1, isSystem: true },
+    { id: 'birthDate', label: 'Data de Nascimento', type: 'date', column: 29, isVisibleInCalendar: false, isRequired: false, order: 2 },
+    { id: 'team', label: 'Equipe', type: 'select', column: 2, isVisibleInCalendar: true, isRequired: true, order: 3, options: [] },
+    { id: 'status', label: 'Status do Andamento', type: 'select', column: 3, isVisibleInCalendar: false, isRequired: true, order: 4 },
+    { id: 'sistema', label: 'Sistema', type: 'select', column: 4, isVisibleInCalendar: true, isRequired: true, order: 5, options: [] },
+    { id: 'medicalRecord', label: 'Prontuário', type: 'text', column: 5, isVisibleInCalendar: false, isRequired: false, order: 6 },
+    { id: 'aihDate', label: 'Data da AIH', type: 'date', column: 6, isVisibleInCalendar: false, isRequired: false, order: 7 },
+    { id: 'surgeryDate', label: 'Data da Cirurgia', type: 'date', column: 7, isVisibleInCalendar: false, isRequired: false, order: 8 },
+    { id: 'clinicalData', label: 'Dados Clínicos / Caso', type: 'textarea', column: 8, isVisibleInCalendar: false, isRequired: false, order: 9 },
+    { id: 'preceptor', label: 'Médico Preceptor', type: 'select', column: 9, isVisibleInCalendar: false, isRequired: false, order: 10, options: [] },
+    { id: 'resident', label: 'Médico Residente Principal', type: 'select', column: 10, isVisibleInCalendar: false, isRequired: false, order: 11, options: [] },
+    { id: 'caseDiscussion', label: 'Discussão do Caso', type: 'textarea', column: 11, isVisibleInCalendar: false, isRequired: false, order: 12 },
+    { id: 'contactPhone', label: 'Telefone de Contato', type: 'text', column: 12, isVisibleInCalendar: false, isRequired: false, order: 13 },
+    { id: 'preAnestheticEval', label: 'Avaliação Anestésica', type: 'textarea', column: 13, isVisibleInCalendar: false, isRequired: false, order: 14 },
+    { id: 'priority', label: 'Prioridade', type: 'select', column: 14, isVisibleInCalendar: false, isRequired: false, order: 15, options: ['1', '2', '3'] },
+    { id: 'age', label: 'Idade', type: 'text', column: 15, isVisibleInCalendar: false, isRequired: false, order: 16 },
+    { id: 'needsICU', label: 'Necessidade UTI', type: 'select', column: 16, isVisibleInCalendar: false, isRequired: false, order: 17, options: ['Sim', 'Não'] },
+    { id: 'latexAllergy', label: 'Alergia Latex', type: 'select', column: 17, isVisibleInCalendar: false, isRequired: false, order: 18, options: ['Sim', 'Não'] },
+    { id: 'jehovahsWitness', label: 'T. Jeová', type: 'select', column: 18, isVisibleInCalendar: false, isRequired: false, order: 19, options: ['Sim', 'Não'] },
+    { id: 'examPdfPath', label: 'PDF Exame', type: 'text', column: 19, isVisibleInCalendar: false, isRequired: false, order: 20 },
+    { id: 'lastUpdated', label: 'Última Atualização', type: 'text', column: 20, isVisibleInCalendar: false, isRequired: false, order: 21, isSystem: true },
+    { id: 'cpf', label: 'CPF', type: 'text', column: 21, isVisibleInCalendar: false, isRequired: false, order: 22 },
+    { id: 'city', label: 'Cidade', type: 'text', column: 22, isVisibleInCalendar: false, isRequired: false, order: 23 },
+    { id: 'auxiliaryResidents', label: 'Residentes Auxiliares', type: 'checkbox', column: 23, isVisibleInCalendar: false, isRequired: false, order: 24, options: [] },
+    { id: 'observations', label: 'Observações / Pendências', type: 'textarea', column: 24, isVisibleInCalendar: false, isRequired: false, order: 25 },
+    { id: 'lastUpdatedBy', label: 'Modificado Por', type: 'text', column: 25, isVisibleInCalendar: false, isRequired: false, order: 26, isSystem: true },
+    { id: 'hospital', label: 'Local da Cirurgia', type: 'select', column: 26, isVisibleInCalendar: true, isRequired: false, order: 27, options: [] },
+    { id: 'operatingRoom', label: 'Sala Cirúrgica', type: 'text', column: 27, isVisibleInCalendar: true, isRequired: false, order: 28 },
+    { id: 'surgeryTime', label: 'Horário da Cirurgia', type: 'time', column: 28, isVisibleInCalendar: true, isRequired: false, order: 29 },
+];
+
+async function ensureSheetExists(title: string, headers: string[]) {
+    const sheets = getSheets();
+    const spreadsheetId = getSpreadsheetId();
+    
+    try {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+        const exists = spreadsheet.data.sheets?.some(s => s.properties?.title === title);
+        
+        if (!exists) {
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                requestBody: {
+                    requests: [{
+                        addSheet: { properties: { title } }
+                    }]
+                }
+            });
+            
+            // Add headers
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${title}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: [headers] }
+            });
+        }
+    } catch (e) {
+        console.error(`Erro ao verificar/criar aba ${title}:`, e);
+    }
+}
+
+export async function getFieldSchema(): Promise<FieldSchema[]> {
+    noStore();
+    try {
+        const sheets = getSheets();
+        const spreadsheetId = getSpreadsheetId();
+
+        await ensureSheetExists('ConfigCampos', ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM"]);
+
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: 'ConfigCampos!A2:I',
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) return INITIAL_SCHEMA;
+
+        return rows.map(row => ({
+            id: row[0],
+            label: row[1],
+            type: row[2] as FieldType,
+            options: row[3] ? row[3].split(',').map((s: string) => s.trim()) : undefined,
+            column: parseInt(row[4]),
+            isVisibleInCalendar: row[5] === 'TRUE',
+            isRequired: row[6] === 'TRUE',
+            order: parseInt(row[7]),
+            isSystem: row[8] === 'TRUE'
+        })).sort((a, b) => a.order - b.order);
+    } catch (error) {
+        console.error('Erro ao buscar esquema de campos:', error);
+        return INITIAL_SCHEMA;
+    }
+}
+
+export async function saveFieldSchema(schema: FieldSchema[]): Promise<void> {
+    try {
+        const sheets = getSheets();
+        const spreadsheetId = getSpreadsheetId();
+
+        const values = schema.map(f => [
+            f.id,
+            f.label,
+            f.type,
+            f.options ? f.options.join(', ') : '',
+            f.column,
+            f.isVisibleInCalendar ? 'TRUE' : 'FALSE',
+            f.isRequired ? 'TRUE' : 'FALSE',
+            f.order,
+            f.isSystem ? 'TRUE' : 'FALSE'
+        ]);
+
+        const header = ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM"];
+        
+        await ensureSheetExists('ConfigCampos', header);
+
+        await sheets.spreadsheets.values.clear({
+            spreadsheetId,
+            range: 'ConfigCampos!A:I'
+        });
+
+        await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: 'ConfigCampos!A1',
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [header, ...values] }
+        });
+    } catch (error) {
+        console.error('Erro ao salvar esquema de campos:', error);
+        throw error;
+    }
+}
+
 // ========================
 // PACIENTES (Aba Pacientes)
 // ========================
 
 export async function getPatientsFromSheet(): Promise<Patient[]> {
-    noStore(); // Força Vercel a nunca fazer cache desta requisição
+    noStore();
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
+        const schema = await getFieldSchema();
+        
+        const maxColIndex = Math.max(...schema.map(f => f.column));
+        const range = `Pacientes!A2:${getColumnLetter(maxColIndex)}`;
 
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Pacientes!A2:AC', // Até a coluna AC (29 colunas)
+            range,
         });
 
         const rows = response.data.values;
         if (!rows || rows.length === 0) return [];
 
         return rows.map((row) => {
-            let parsedStatus = row[3] as string || 'SEM STATUS';
-            if (parsedStatus === 'OBSERVAÇÕES' || parsedStatus === 'PENDÊNCIAS') {
-                parsedStatus = 'OBSERVAÇÕES/PENDÊNCIAS';
-            }
-            return {
-            id: row[0] || '',
-            name: row[1] || '',
-            team: row[2] || '',
-            status: parsedStatus as PatientStatus,
-            sistema: row[4] || '',
-            medicalRecord: row[5] || '',
-            aihDate: row[6] || '',
-            surgeryDate: row[7] || '',
-            clinicalData: row[8] || '',
-            preceptor: row[9] || '',
-            resident: row[10] || '',
-            caseDiscussion: row[11] || '',
-            contactPhone: row[12] || '',
-            preAnestheticEval: row[13] || '',
-            priority: (row[14] as '1' | '2' | '3') || undefined,
-            age: row[15] || '',
-            needsICU: (row[16] as 'Sim' | 'Não') || 'Não',
-            latexAllergy: (row[17] as 'Sim' | 'Não') || 'Não',
-            jehovahsWitness: (row[18] as 'Sim' | 'Não') || 'Não',
-            examPdfPath: row[19] || undefined,
-            lastUpdated: row[20] || new Date().toISOString(),
-            cpf: row[21] || '',
-            city: row[22] || '',
-            auxiliaryResidents: (function() { try { return JSON.parse(row[23] || '[]'); } catch { return []; } })(),
-            observations: row[24] || '',
-            lastUpdatedBy: row[25] || undefined,
-            hospital: row[26] || undefined,
-            operatingRoom: row[27] || undefined,
-            surgeryTime: row[28] || undefined,
-            };
+            const patient: Patient = { id: '', name: '' };
+            
+            schema.forEach(field => {
+                let value = row[field.column] || '';
+                
+                // Conversões de tipo específicas
+                if (field.type === 'checkbox') {
+                    try { value = JSON.parse(value || '[]'); } catch { value = []; }
+                }
+
+                // Legado: Conversão de status (mantém compatibilidade com o que existia antes)
+                if (field.id === 'status') {
+                    if (value === 'OBSERVAÇÕES' || value === 'PENDÊNCIAS') {
+                        value = 'OBSERVAÇÕES/PENDÊNCIAS';
+                    }
+                }
+
+                patient[field.id] = value;
+            });
+            
+            return patient;
         });
     } catch (error) {
         console.error('Erro ao buscar pacientes:', error);
-        return []; // Retorna lista vazia em vez de quebrar a página inicial
+        return [];
     }
 }
 
@@ -104,47 +242,38 @@ export async function savePatientsToSheet(patients: Patient[]): Promise<void> {
     try {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
+        const schema = await getFieldSchema();
 
-        // Mapeando a lista inteira para o Google Sheets
-        const values = patients.map(p => [
-            p.id || Date.now().toString(),
-            p.name || '',
-            p.team || '',
-            p.status || 'SEM STATUS',
-            p.sistema || '',
-            p.medicalRecord || '',
-            p.aihDate || '',
-            p.surgeryDate || '',
-            p.clinicalData || '',
-            p.preceptor || '',
-            p.resident || '',
-            p.caseDiscussion || '',
-            p.contactPhone || '',
-            p.preAnestheticEval || '',
-            p.priority || '',
-            p.age || '',
-            p.needsICU || 'Não',
-            p.latexAllergy || 'Não',
-            p.jehovahsWitness || 'Não',
-            p.examPdfPath || '',
-            p.lastUpdated || new Date().toISOString(),
-            p.cpf || '',
-            p.city || '',
-            JSON.stringify(p.auxiliaryResidents || []),
-            p.observations || '',
-            p.lastUpdatedBy || '',
-            p.hospital || '',
-            p.operatingRoom || '',
-            p.surgeryTime || ''
-        ]);
+        const maxColIndex = Math.max(...schema.map(f => f.column));
+        const range = `Pacientes!A:${getColumnLetter(maxColIndex)}`;
 
-        // Cabeçalho
-        const header = ["ID", "NOME", "EQUIPE", "STATUS", "SISTEMA", "PRONTUARIO", "DATA_AIH", "DATA_CIRURGIA", "DADOS_CLINICOS", "PRECEPTOR", "RESIDENTE", "DISCUSSAO", "TELEFONE", "AVAL_ANESTESICA", "PRIORIDADE", "IDADE", "UTI", "LATEX", "TESTEMUNHA", "EXAM_PDF", "LAST_UPDATED", "CPF", "CIDADE", "RESIDENTES_AUX", "OBSERVACOES", "LAST_UPDATED_BY", "HOSPITAL", "SALA", "HORARIO"];
-        
-        // Limpar a aba toda e escrever os novos (para manter integridade como o .csv fazia)
+        // Mapeando a lista inteira para o Google Sheets baseado no schema
+        const header = new Array(maxColIndex + 1).fill('');
+        schema.forEach(f => {
+            header[f.column] = f.label.toUpperCase();
+        });
+
+        const values = patients.map(p => {
+            const row = new Array(maxColIndex + 1).fill('');
+            schema.forEach(field => {
+                let val = p[field.id];
+                
+                if (field.id === 'id' && !val) val = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                if (field.id === 'lastUpdated' && !val) val = new Date().toISOString();
+                
+                if (field.type === 'checkbox') {
+                    val = JSON.stringify(val || []);
+                }
+                
+                row[field.column] = val !== undefined && val !== null ? String(val) : '';
+            });
+            return row;
+        });
+
+        // Limpar a aba e atualizar
         await sheets.spreadsheets.values.clear({
             spreadsheetId,
-            range: 'Pacientes!A:AC'
+            range
         });
 
         await sheets.spreadsheets.values.update({

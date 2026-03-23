@@ -2,7 +2,8 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { getPatientsFromSheet, savePatientsToSheet, logAccess } from '../lib/google-sheets';
+import { getPatientsFromSheet, savePatientsToSheet, logAccess, getFieldSchema } from '../lib/google-sheets';
+import { logPatientChange, logPatientAction, getPatientChangeLogs } from '../lib/audit-log';
 import { Patient } from '../types';
 import { cookies } from 'next/headers';
 
@@ -21,6 +22,7 @@ export async function createPatientAction(patient: Omit<Patient, 'id'>) {
         const newPatient: Patient = {
             ...patient,
             id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+            name: String(patient.name),
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: decodedName
         };
@@ -29,8 +31,8 @@ export async function createPatientAction(patient: Omit<Patient, 'id'>) {
         await savePatientsToSheet(updatedPatients);
         
         // Registrar log de auditoria
+        await logPatientAction(newPatient.id, newPatient.name, 'CREATE', decodedName);
         await logAccess(decodedName, `CRIOU PACIENTE: ${newPatient.name}`).catch(console.error);
-        
         
         return { success: true, patient: newPatient };
     } catch (error) {
@@ -43,9 +45,28 @@ export async function updatePatientAction(patient: Patient) {
     console.log('Update requested for:', patient.name);
     try {
         const patients = await getPatientsFromSheet();
+        const schema = await getFieldSchema();
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
+
+        const oldPatient = patients.find(p => p.id === patient.id);
+        
+        if (oldPatient) {
+            // Comparar campos e registrar mudanças
+            for (const field of schema) {
+                const oldVal = oldPatient[field.id];
+                const newVal = patient[field.id];
+                
+                // Normalizar comparação (arrays como string)
+                const sOld = Array.isArray(oldVal) ? JSON.stringify(oldVal) : String(oldVal || '');
+                const sNew = Array.isArray(newVal) ? JSON.stringify(newVal) : String(newVal || '');
+
+                if (sOld !== sNew && field.id !== 'lastUpdated' && field.id !== 'lastUpdatedBy') {
+                    await logPatientChange(patient.id, patient.name, field.label, sOld, sNew, decodedName);
+                }
+            }
+        }
 
         const updatedPatients = patients.map(p => 
             p.id === patient.id ? { ...patient, lastUpdated: new Date().toISOString(), lastUpdatedBy: decodedName } : p
@@ -53,7 +74,7 @@ export async function updatePatientAction(patient: Patient) {
         
         await savePatientsToSheet(updatedPatients);
         
-        // Registrar log de auditoria
+        // Log genérico de acesso
         await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name}`).catch(console.error);
         return { success: true };
     } catch (error) {
@@ -66,14 +87,16 @@ export async function deletePatientAction(patientId: string) {
     console.log('Delete requested for ID:', patientId);
     try {
         const patients = await getPatientsFromSheet();
+        const patientToDelete = patients.find(p => p.id === patientId);
         const updatedPatients = patients.filter(p => p.id !== patientId);
         
-        // We do NOT re-index their IDs anymore since they are unique identifiers now
         await savePatientsToSheet(updatedPatients);
 
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
+        
+        await logPatientAction(patientId, patientToDelete?.name || 'Desconhecido', 'DELETE', decodedName);
         await logAccess(decodedName, `EXCLUIU PACIENTE ID: ${patientId}`).catch(console.error);
 
         return { success: true };
@@ -122,4 +145,8 @@ export async function uploadExamAction(formData: FormData) {
         console.error('Upload Error:', error);
         return { success: false, error: message };
     }
+}
+
+export async function getPatientChangeLogsAction() {
+    return await getPatientChangeLogs();
 }

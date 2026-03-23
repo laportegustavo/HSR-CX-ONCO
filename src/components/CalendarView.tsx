@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Patient } from "../types";
-import { ChevronLeft, ChevronRight, Clock, Stethoscope, Building2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Stethoscope, Building2 } from "lucide-react";
 import { DateTime } from "luxon";
+import { useMemo, useLayoutEffect, useRef } from "react";
 
 interface CalendarViewProps {
     patients: Patient[];
@@ -35,12 +36,6 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
         return isoDate.isValid ? isoDate : null;
     };
 
-    const getSurgeriesForDate = (date: DateTime) => {
-        return patients.filter(p => {
-            const pDate = parseSurgeryDate(p.surgeryDate);
-            return pDate && pDate.hasSame(date, 'day');
-        });
-    };
 
     const getTimeOffset = (timeStr?: string) => {
         if (!timeStr || !timeStr.includes(':')) return null;
@@ -60,14 +55,30 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
         return relativeHour * HOUR_HEIGHT;
     };
 
-    const formatDate = (dateStr: string | undefined): string => {
-        const dt = parseSurgeryDate(dateStr);
-        return dt ? dt.toFormat('dd/MM/yyyy') : (dateStr || '--');
-    };
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    const hasAIH = (aihDate?: string | null) => {
-        return typeof aihDate === 'string' && aihDate !== '--' && aihDate !== '00/00/0000' && aihDate.trim() !== '' && !aihDate.toLowerCase().includes('pendente');
-    };
+    useLayoutEffect(() => {
+        if (!containerRef.current) return;
+        const cards = containerRef.current.querySelectorAll<HTMLElement>('[data-card-top]');
+        cards.forEach(card => {
+            const top = card.getAttribute('data-card-top');
+            if (top) card.style.top = `${top}px`;
+        });
+    }, [patients, currentDate]);
+
+    const daySurgeriesMap = useMemo(() => {
+        const map = new Map<string, Patient[]>();
+        days.forEach(day => {
+            const key = day.toFormat('yyyy-MM-dd');
+            map.set(key, patients.filter(p => {
+                const pDate = parseSurgeryDate(p.surgeryDate);
+                return pDate && pDate.hasSame(day, 'day');
+            }));
+        });
+        return map;
+    }, [patients, days]);
+
+
 
     return (
         <div className="flex flex-col h-[600px] bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-12">
@@ -141,13 +152,13 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                 </div>
 
                 {/* Timeline Grid Area */}
-                <div className="flex-1 overflow-y-auto no-scrollbar relative bg-slate-50/10">
-                    <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] min-h-full transition-all duration-500" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+                <div className="flex-1 overflow-y-auto no-scrollbar relative bg-slate-50/10" ref={containerRef}>
+                    <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] min-h-full transition-all duration-500 h-[600px]">
                         
                         {/* Time labels column */}
                         <div className="col-span-1 border-r border-slate-100 bg-white/80 backdrop-blur-sm sticky left-0 z-10">
                             {HOURS.map((hour) => (
-                                <div key={hour} className={`relative ${hour % 2 === 0 ? 'border-b border-slate-100' : 'border-b border-slate-50/50'}`} style={{ height: HOUR_HEIGHT }}>
+                                <div key={hour} className={`relative h-[40px] ${hour % 2 === 0 ? 'border-b border-slate-100' : 'border-b border-slate-50/50'}`}>
                                     {hour % 2 === 1 && (
                                         <span className="absolute -top-2.5 right-3 text-[10px] font-black text-slate-400 tabular-nums">
                                             {hour.toString().padStart(2, '0')}:00
@@ -159,73 +170,69 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
 
                         {/* Columns for each day */}
                         {days.map((day, dayIdx) => {
-                            const daySurgeries = getSurgeriesForDate(day);
+                            const dateKey = day.toFormat('yyyy-MM-dd');
+                            const daySurgeries = daySurgeriesMap.get(dateKey) || [];
                             const isToday = day.hasSame(DateTime.now(), "day");
                             
                             return (
                                 <div key={dayIdx} className={`relative border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-blue-50/5' : ''}`}>
                                     {/* Hour background lines */}
                                     {HOURS.map((h) => (
-                                        <div key={h} className={`${h % 2 === 0 ? 'border-b border-slate-100' : 'border-b border-slate-50/50'}`} style={{ height: HOUR_HEIGHT }}></div>
+                                        <div key={h} className="h-[40px] border-b border-slate-100 last:border-b-0"></div>
                                     ))}
 
                                     {/* Medical Surgery Cards */}
-                                    {daySurgeries.map((patient) => {
-                                        const top = getTimeOffset(patient.surgeryTime) ?? (10 + (daySurgeries.indexOf(patient) * 45));
-                                        const aih = hasAIH(patient.aihDate);
+                                    {daySurgeries.map((patient, pIdx) => {
+                                        const top = getTimeOffset(patient.surgeryTime) ?? (10 + (pIdx * 50));
                                         const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
                                         const isReady = patient.status === 'PRONTOS';
+                                        
+                                        // Robust check for hospital/room
+                                        const hasHospital = patient.hospital && patient.hospital.trim() !== "" && patient.hospital !== "--";
+                                        const hasRoom = patient.operatingRoom && patient.operatingRoom.trim() !== "" && patient.operatingRoom !== "--";
+                                        const showLocation = hasHospital || hasRoom;
 
                                         return (
                                             <div 
                                                 key={patient.id}
                                                 onClick={() => onPatientClick(patient)}
-                                                className={`absolute left-1 right-1 p-1.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:z-20 shadow-md border-l-4 group ${
+                                                data-card-top={top}
+                                                className={`absolute left-1 right-1 p-1.5 rounded-xl cursor-pointer transition-all hover:scale-[1.02] hover:z-20 shadow-md border-l-4 group min-h-[46px] ${
                                                     isSurgeryDone 
                                                         ? 'bg-white border-l-orange-500 shadow-orange-100/30' 
                                                         : isReady 
                                                             ? 'bg-white border-l-emerald-500 shadow-emerald-100/30' 
                                                             : 'bg-white border-l-blue-500 shadow-blue-100/30'
                                                 }`}
-                                                style={{ 
-                                                    top,
-                                                    minHeight: '46px',
-                                                }}
                                             >
-                                                <div className="flex flex-col h-full justify-between overflow-hidden">
-                                                    <div>
-                                                        <div className="flex items-center justify-between mb-1 gap-1">
-                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 border ${
-                                                                patient.sistema === 'SUS' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                                                            }`}>
-                                                                SISTEMA: {patient.sistema || 'SUS'}
+                                                <div className="flex flex-col h-full justify-start gap-1 overflow-hidden">
+                                                    {/* 1. Nome do Paciente */}
+                                                    <p className="text-[10px] font-black text-slate-900 leading-tight uppercase truncate">
+                                                        {patient.name}
+                                                    </p>
+                                                    {/* 2. Equipe */}
+                                                    <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500 uppercase">
+                                                        <Stethoscope size={9} className="text-slate-400 shrink-0" />
+                                                        <span className="truncate">EQ: {patient.team}</span>
+                                                    </div>
+                                                    {/* 3. Sistema */}
+                                                    <div className="flex items-center">
+                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 border ${
+                                                            patient.sistema === 'SUS' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        }`}>
+                                                            SISTEMA: {patient.sistema || 'SUS'}
+                                                        </span>
+                                                    </div>
+                                                    {/* 4 & 5. Hospital e Sala */}
+                                                    {showLocation && (
+                                                        <div className="flex items-center gap-1 text-[8px] font-bold text-slate-700 uppercase mt-0.5">
+                                                            <Building2 size={9} className="text-slate-400 shrink-0" />
+                                                            <span className="truncate">
+                                                                {hasHospital ? patient.hospital : ''} 
+                                                                {hasRoom ? ` [S ${patient.operatingRoom}]` : ''}
                                                             </span>
-                                                            {patient.surgeryTime && (
-                                                                <span className="text-[9px] font-black text-blue-600 flex items-center gap-1 shrink-0">
-                                                                    <Clock size={10} strokeWidth={3} /> {patient.surgeryTime}
-                                                                </span>
-                                                            )}
                                                         </div>
-                                                        <p className="text-[10px] font-black text-slate-900 leading-tight uppercase truncate">
-                                                            {patient.name}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="mt-1.5 space-y-1">
-                                                        <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500">
-                                                            <Stethoscope size={9} className="text-slate-400 shrink-0" />
-                                                            <span className="truncate">EQ: {patient.team}</span>
-                                                        </div>
-                                                        {(patient.hospital || patient.operatingRoom) && (
-                                                            <div className="flex items-center gap-1 text-[8px] font-bold text-slate-600">
-                                                                <Building2 size={9} className="text-slate-400 shrink-0" />
-                                                                <span className="truncate">{patient.hospital} {patient.operatingRoom ? `[S ${patient.operatingRoom}]` : ''}</span>
-                                                            </div>
-                                                        )}
-                                                        <div className={`text-[8px] font-black uppercase tracking-tighter ${aih ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                                            {aih ? `AIH: ${formatDate(patient.aihDate)}` : 'SEM AIH'}
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

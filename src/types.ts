@@ -9,33 +9,24 @@ export type PatientStatus =
 export interface Patient {
   id: string; // Internal UUID
   name: string;
-  cpf: string; // CPF
-  medicalRecord: string; // prontuario
-  aihDate: string; // data de AIH
-  surgeryDate?: string; // data da cirurgia (DD/MM/AAAA)
-  team: string; // equipe
-  preceptor?: string; // médico preceptor
-  resident?: string; // médico residente
-  sistema: string; // sistema
-  clinicalData: string; // dados clinicos
-  caseDiscussion?: string; // discussão do caso
-  contactPhone: string; // telefone de contato
-  city?: string; // cidade
-  hospital?: string; // Local da cirurgia
-  operatingRoom?: string; // Sala cirurgica
-  surgeryTime?: string; // Horário da cirurgia
-  auxiliaryResidents?: string[]; // residentes auxiliares
-  observations?: string; // observações / pendências
-  preAnestheticEval: string; // avaliacao pre-anestesica
-  examPdfPath?: string; // Path to the exam PDF
-  status: PatientStatus;
-  priority?: '1' | '2' | '3'; // priority level
-  age?: string; // idade
-  needsICU?: 'Sim' | 'Não'; // necessidade de UTI
-  latexAllergy?: 'Sim' | 'Não'; // alergia a latex
-  jehovahsWitness?: 'Sim' | 'Não'; // testemunha de jeova
   lastUpdated?: string;
   lastUpdatedBy?: string;
+  [key: string]: string | string[] | number | boolean | undefined | null; // Allow dynamic fields with specific types
+}
+
+export type FieldType = 'text' | 'select' | 'date' | 'time' | 'textarea' | 'number' | 'checkbox';
+
+export interface FieldSchema {
+  id: string;
+  label: string;
+  type: FieldType;
+  options?: string[];
+  column: number; // 0-indexed column in Sheets
+  isVisibleInCalendar: boolean;
+  isRequired: boolean;
+  order: number;
+  group?: string;
+  isSystem?: boolean; // If true, cannot be deleted (e.g., ID, Name)
 }
 
 export interface MedicalStaff {
