@@ -71,7 +71,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
         days.forEach(day => {
             const key = day.toFormat('yyyy-MM-dd');
             map.set(key, patients.filter(p => {
-                const pDate = parseSurgeryDate(p.surgeryDate);
+                const pDate = parseSurgeryDate(String(p.surgeryDate || ''));
                 return pDate && pDate.hasSame(day, 'day');
             }));
         });
@@ -183,13 +183,13 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
 
                                     {/* Medical Surgery Cards */}
                                     {daySurgeries.map((patient, pIdx) => {
-                                        const top = getTimeOffset(patient.surgeryTime) ?? (10 + (pIdx * 50));
+                                        const top = getTimeOffset(patient.surgeryTime ? String(patient.surgeryTime) : undefined) ?? (10 + (pIdx * 50));
                                         const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
                                         const isReady = patient.status === 'PRONTOS';
                                         
                                         // Robust check for hospital/room
-                                        const hasHospital = patient.hospital && patient.hospital.trim() !== "" && patient.hospital !== "--";
-                                        const hasRoom = patient.operatingRoom && patient.operatingRoom.trim() !== "" && patient.operatingRoom !== "--";
+                                        const hasHospital = patient.hospital && String(patient.hospital).trim() !== "" && patient.hospital !== "--";
+                                        const hasRoom = patient.operatingRoom && String(patient.operatingRoom).trim() !== "" && patient.operatingRoom !== "--";
                                         const showLocation = hasHospital || hasRoom;
 
                                         return (
@@ -206,9 +206,8 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                                 }`}
                                             >
                                                 <div className="flex flex-col h-full justify-start gap-1 overflow-hidden">
-                                                    {/* 1. Nome do Paciente */}
                                                     <p className="text-[10px] font-black text-slate-900 leading-tight uppercase truncate">
-                                                        {patient.name}
+                                                        {String(patient.name || '')}
                                                     </p>
                                                     {/* 2. Equipe */}
                                                     <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500 uppercase">

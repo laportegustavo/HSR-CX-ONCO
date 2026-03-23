@@ -101,49 +101,43 @@ export default function FieldManager() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                 <div>
-                    <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                        <Settings2 className="text-blue-600" size={24} />
-                        Gerenciar Campos do Paciente
-                    </h2>
-                    <p className="text-sm text-slate-500 font-medium">
-                        Arraste para reordenar. Adicione, remova ou edite a visibilidade dos campos.
-                    </p>
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Configuração de Colunas</h3>
                 </div>
                 <div className="flex gap-3">
                     <button 
                         onClick={handleAddField}
                         title="Adicionar novo campo"
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95"
                     >
-                        <Plus size={16} /> Novo Campo
+                        <Plus size={14} /> Novo Campo
                     </button>
                     <button 
                         onClick={handleSave}
                         disabled={saving}
                         title="Salvar todas as alterações no Google Sheets"
-                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 active:scale-95"
+                        className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 active:scale-95"
                     >
-                        {saving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Save size={16} />}
-                        Salvar Alterações
+                        {saving ? <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div> : <Save size={14} />}
+                        Salvar Esquema
                     </button>
                 </div>
             </div>
 
             {message && (
-                <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+                <div className={`p-3 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 mb-4 ${
                     message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
                 }`}>
-                    {message.type === 'success' ? <Check size={20} /> : <AlertCircle size={20} />}
-                    <p className="text-sm font-bold uppercase tracking-tight">{message.text}</p>
+                    {message.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
+                    <p className="text-[10px] font-black uppercase tracking-tight">{message.text}</p>
                     <button onClick={() => setMessage(null)} title="Fechar aviso" className="ml-auto opacity-50 hover:opacity-100 transition-opacity">
-                        <X size={16} />
+                        <X size={14} />
                     </button>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-slate-50/50 rounded-3xl border border-slate-100 overflow-hidden">
                 <DragDropContext onDragEnd={onDragEnd}>
                     <Droppable droppableId="fields">
                         {(provided) => (
@@ -155,6 +149,7 @@ export default function FieldManager() {
                                             <th className="px-6 py-4">ID / Label</th>
                                             <th className="px-6 py-4 w-44">Tipo</th>
                                             <th className="px-6 py-4 w-24 text-center">Calendário</th>
+                                            <th className="px-6 py-4 w-24 text-center">Formulário</th>
                                             <th className="px-6 py-4 w-24 text-center">Obrigat.</th>
                                             <th className="px-6 py-4 w-24 text-right pr-10">Ação</th>
                                         </tr>
@@ -208,6 +203,15 @@ export default function FieldManager() {
                                                                 checked={field.isVisibleInCalendar}
                                                                 title="Exibir no Cartão do Calendário"
                                                                 onChange={(e) => handleUpdateField(field.id, { isVisibleInCalendar: e.target.checked })}
+                                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={field.isVisibleInForm !== false}
+                                                                title="Exibir no Formulário de Paciente"
+                                                                onChange={(e) => handleUpdateField(field.id, { isVisibleInForm: e.target.checked })}
                                                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                                                             />
                                                         </td>

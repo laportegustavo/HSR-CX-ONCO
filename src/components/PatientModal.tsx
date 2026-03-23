@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { X, Camera, Loader2, Trash2 } from "lucide-react";
-import { createWorker } from 'tesseract.js';
-import { Patient, PatientStatus, MedicalStaff, FieldSchema } from "../types";
+import { createWorker, PSM } from 'tesseract.js';
+import { toast } from "sonner";
+import { Patient, MedicalStaff, FieldSchema } from "../types";
 import { getStaff } from "../app/staff-actions";
 import { updatePatientAction, createPatientAction, deletePatientAction } from "../app/actions";
 import { getFieldSchema } from "../app/field-actions";
@@ -15,30 +16,56 @@ interface PatientModalProps {
     onSave: () => void;
 }
 
+interface HistoryLog {
+    timestamp: string;
+    user: string;
+    patientId: string;
+    patientName: string;
+    field: string;
+    oldValue: string;
+    newValue: string;
+}
+
 export default function PatientModal({ patient, isOpen, onClose, onSave }: PatientModalProps) {
     const [formData, setFormData] = useState<Patient | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [processingStatus, setProcessingStatus] = useState<string>("");
     const [staff, setStaff] = useState<MedicalStaff[]>([]);
     const [config, setConfig] = useState<{ teams: string[], systems: string[], hospitals: string[] }>({ teams: [], systems: [], hospitals: [] });
     const [schema, setSchema] = useState<FieldSchema[]>([]);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [activeTab, setActiveTab] = useState<'data' | 'history'>('data');
+    const [history, setHistory] = useState<HistoryLog[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
 
     useEffect(() => {
+        const fetchInitialData = async () => {
+            const [staffData, configData, schemaData] = await Promise.all([
+                getStaff(),
+                import('../app/config-actions').then(m => m.getConfig()),
+                getFieldSchema()
+            ]);
+            setStaff(staffData);
+            setConfig(configData);
+            setSchema(schemaData);
+
+            if (patient?.id) {
+                setLoadingHistory(true);
+                try {
+                    const logs = await import('../app/actions').then(m => m.getPatientChangeLogsAction());
+                    setHistory(logs.filter((l: HistoryLog) => l.patientId === patient.id));
+                } catch (err) {
+                    console.error("Error loading patient history:", err);
+                } finally {
+                    setLoadingHistory(false);
+                }
+            }
+        };
+
         if (isOpen) {
             fetchInitialData();
         }
-    }, [isOpen]);
-
-    const fetchInitialData = async () => {
-        const [staffData, configData, schemaData] = await Promise.all([
-            getStaff(),
-            import('../app/config-actions').then(m => m.getConfig()),
-            getFieldSchema()
-        ]);
-        setStaff(staffData);
-        setConfig(configData);
-        setSchema(schemaData);
-    };
+    }, [isOpen, patient?.id]);
 
     useEffect(() => {
         if (isOpen && schema.length > 0) {
@@ -80,18 +107,29 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
         
         const newFormData = { ...formData, [fieldId]: value };
 
-        // Auto-calculate age if birthDate is changed
+        // Auto-calculate age if birthDate is changed (Format: DD/MM/AAAA)
         if (fieldId === 'birthDate' && typeof value === 'string' && value.length === 10) {
-            const [d, m, y] = value.split('/').map(Number);
-            if (!isNaN(d) && !isNaN(m) && !isNaN(y) && y > 1900) {
-                const today = new Date();
-                let age = today.getFullYear() - y;
-                const monthDiff = today.getMonth() - (m - 1);
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
-                    age--;
-                }
-                if (age >= 0) {
-                    newFormData['age'] = age.toString();
+            const parts = value.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                
+                if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year > 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                    const today = new Date();
+                    const birthDate = new Date(year, month - 1, day);
+                    
+                    if (birthDate < today) {
+                        let age = today.getFullYear() - birthDate.getFullYear();
+                        const m = today.getMonth() - birthDate.getMonth();
+                        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                            age--;
+                        }
+                        
+                        if (age >= 0) {
+                            newFormData['age'] = age.toString();
+                        }
+                    }
                 }
             }
         }
@@ -114,9 +152,63 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
         if (!file || !formData) return;
 
         setUploading(true);
+        setProcessingStatus("Otimizando imagem...");
+
         try {
+            // Pre-processamento via Canvas
+            const imageUrl = URL.createObjectURL(file);
+            const img = new Image();
+            
+            const processedDataUrl = await new Promise<string>((resolve) => {
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    if (!ctx) {
+                        resolve(imageUrl);
+                        return;
+                    }
+
+                    // Aumentar escala para melhor OCR (2x se pequeno)
+                    const scale = img.width < 1500 ? 2 : 1;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+
+                    // Filtro de Contraste + Binarização Adaptativa Simples
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                        
+                        // Thresholding para transformar em P&B puro (melhora OCR)
+                        const threshold = 145; 
+                        const v = gray > threshold ? 255 : 0;
+                        
+                        data[i] = v;
+                        data[i+1] = v;
+                        data[i+2] = v;
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = imageUrl;
+            });
+
+            setProcessingStatus("Extraindo texto...");
             const worker = await createWorker('por');
-            const ret = await worker.recognize(file);
+            
+            // Configurar parâmetros do motor
+            await worker.setParameters({
+                tessedit_pageseg_mode: PSM.AUTO,
+            });
+
+            const ret = await worker.recognize(processedDataUrl);
             const text = ret.data.text;
             
             setFormData(prev => prev ? { 
@@ -125,14 +217,17 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
             } : null);
             
             await worker.terminate();
+            URL.revokeObjectURL(imageUrl);
+            setProcessingStatus("Pronto!");
+            toast.success("Texto extraído com sucesso!");
         } catch (error) {
             console.error('OCR error:', error);
-            alert('Erro ao processar imagem para OCR.');
+            toast.error('Erro ao processar imagem para OCR.');
         } finally {
             setUploading(false);
+            setTimeout(() => setProcessingStatus(""), 2000);
         }
     };
-
     const isValidDate = (dateString: string) => {
         if (!dateString) return true;
         const regex = /^\d{2}\/\d{2}\/\d{4}$/;
@@ -148,7 +243,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
             // Validate all date fields in schema
             for (const field of schema) {
                 if (field.type === 'date' && formData[field.id] && !isValidDate(String(formData[field.id]))) {
-                    alert(`${field.label} inválida. Utilize o formato DD/MM/AAAA.`);
+                    toast.error(`${field.label} inválida. Utilize o formato DD/MM/AAAA.`);
                     return;
                 }
             }
@@ -156,14 +251,16 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
             try {
                 if (formData.id) {
                     await updatePatientAction(formData);
+                    toast.success("Paciente atualizado com sucesso!");
                 } else {
                     await createPatientAction(formData);
+                    toast.success("Novo paciente criado com sucesso!");
                 }
                 onSave();
                 onClose();
             } catch (error) {
                 console.error("Error saving patient:", error);
-                alert("Erro ao salvar paciente.");
+                toast.error("Erro ao salvar paciente. Tente novamente.");
             }
         }
     };
@@ -177,11 +274,12 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
         if (!patient) return;
         try {
             await deletePatientAction(patient.id);
+            toast.success("Paciente excluído com sucesso.");
             onSave();
             onClose();
         } catch (error) {
             console.error("Error deleting patient:", error);
-            alert("Erro ao excluir paciente.");
+            toast.error("Erro ao excluir paciente.");
         } finally {
             setIsConfirmingDelete(false);
         }
@@ -199,7 +297,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
             case 'auxiliaryResidents':
                 return staff.filter((s: MedicalStaff) => s.type === 'resident').map((s: MedicalStaff) => s.systemName).sort((a: string, b: string) => a.localeCompare(b));
             case 'status':
-                return ["AGENDADOS", "CIRURGIA REALIZADA", "OBSERVAÇÕES/PENDÊNCIAS", "PERDA DE SEGMENTO", "PRONTOS", "SEM STATUS"];
+                return ["AGENDADOS", "CIRURGIA REALIZADA", "OBSERVAÇÕES/PENDÊNCIAS", "PERDA DE SEGUIMENTO", "PRONTOS", "SEM STATUS"];
             case 'priority':
                 return ['1', '2', '3'];
             default: return [];
@@ -218,9 +316,11 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                     {field.isRequired && <span className="text-rose-500 ml-1">*</span>}
                 </label>
                 {field.id === 'clinicalData' && (
-                    <label className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase tracking-widest cursor-pointer hover:text-blue-700 transition-all bg-blue-50 px-2 py-1 rounded-lg">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-widest cursor-pointer hover:text-blue-700 transition-all bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 shadow-sm grow-0">
                         {uploading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
-                        {uploading ? 'Processando...' : 'Leitor OCR (IA)'}
+                        <span className="truncate max-w-[120px]">
+                            {uploading ? (processingStatus || 'Processando...') : 'Leitor IA (Scan)'}
+                        </span>
                         <input type="file" accept="image/*" onChange={handleOCR} className="hidden" disabled={uploading}/>
                     </label>
                 )}
@@ -304,12 +404,8 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                         {patient && (
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                 ID: {patient.id}
-                                {patient.lastUpdatedBy && (
-                                    <>
-                                        <span className="mx-2">•</span>
-                                        Última Modificação: {new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} por {patient.lastUpdatedBy}
-                                    </>
-                                )}
+                                <span className="mx-2">•</span>
+                                ÚLTIMA MODIFICAÇÃO: {patient.lastUpdatedBy ? `${new Date(patient.lastUpdated || '').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} POR ${patient.lastUpdatedBy.toUpperCase()}` : 'SEM REGISTRO ESCRITO'}
                             </p>
                         )}
                     </div>
@@ -318,11 +414,61 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
                     </button>
                 </div>
 
-                {/* Form Content */}
+                {/* Tabs */}
+                <div className="flex border-b border-slate-100 bg-white px-4 shrink-0">
+                    <button 
+                        onClick={() => setActiveTab('data')}
+                        className={`px-4 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'data' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Dados do Paciente
+                    </button>
+                    {patient && (
+                        <button 
+                            onClick={() => setActiveTab('history')}
+                            className={`px-4 py-3 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Histórico de Alterações
+                        </button>
+                    )}
+                </div>
+
+                {/* Content */}
                 <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50">
-                    <form id="patient-form" onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
-                        {schema.map(field => renderField(field))}
-                    </form>
+                    {activeTab === 'data' ? (
+                        <form id="patient-form" onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
+                            {schema.filter(field => field.isVisibleInForm !== false).map(field => renderField(field))}
+                        </form>
+                    ) : (
+                        <div className="space-y-4">
+                            {loadingHistory ? (
+                                <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-2">
+                                    <Loader2 className="animate-spin" size={24} />
+                                    Carregando histórico...
+                                </div>
+                            ) : history.length === 0 ? (
+                                <div className="p-12 text-center text-slate-400 italic">
+                                    Nenhuma alteração registrada para este paciente.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {history.map((log, i) => (
+                                        <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{log.timestamp}</span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-full">{log.user}</span>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{log.field}:</span>
+                                                <span className="text-xs text-rose-500 line-through decoration-2">{log.oldValue || '-'}</span>
+                                                <span className="text-xs text-slate-300">→</span>
+                                                <span className="text-xs font-bold text-emerald-600">{log.newValue || '-'}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer Actions - Sticky on Mobile */}

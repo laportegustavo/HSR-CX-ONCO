@@ -1,9 +1,10 @@
 export type PatientStatus = 
   | 'PRONTOS'
   | 'OBSERVAÇÕES/PENDÊNCIAS'
+  | 'DISCUTIR EM ROUND'
   | 'AGENDADOS'
   | 'CIRURGIA REALIZADA'
-  | 'PERDA DE SEGMENTO'
+  | 'PERDA DE SEGUIMENTO'
   | 'SEM STATUS';
 
 export interface Patient {
@@ -27,6 +28,7 @@ export interface FieldSchema {
   order: number;
   group?: string;
   isSystem?: boolean; // If true, cannot be deleted (e.g., ID, Name)
+  isVisibleInForm?: boolean; // If false, hide from the patient modal form
 }
 
 export interface MedicalStaff {

@@ -1,4 +1,4 @@
-import { getSheets, getSpreadsheetId } from './google-sheets';
+import { getSheets, getSpreadsheetId, ensureSheetExists } from './google-sheets';
 
 export async function logPatientChange(
   patientId: string, 
@@ -12,6 +12,8 @@ export async function logPatientChange(
     const sheets = getSheets();
     const spreadsheetId = getSpreadsheetId();
     
+    await ensureSheetExists('HistoricoAlteracoes', ['Data/Hora', 'Usuário', 'Paciente ID', 'Paciente Nome', 'Campo', 'Valor Antigo', 'Valor Novo']);
+
     const now = new Date();
     const timestamp = new Intl.DateTimeFormat('pt-BR', { 
       dateStyle: 'short', 
@@ -64,6 +66,8 @@ export async function getPatientChangeLogs(): Promise<{
   try {
     const sheets = getSheets();
     const spreadsheetId = getSpreadsheetId();
+
+    await ensureSheetExists('HistoricoAlteracoes', ['Data/Hora', 'Usuário', 'Paciente ID', 'Paciente Nome', 'Campo', 'Valor Antigo', 'Valor Novo']);
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,

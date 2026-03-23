@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, DragEvent } from "react";
 import { 
     Search, Activity, RefreshCw, LayoutList, LayoutGrid, Plus, Users, 
     ArrowUpDown, ArrowUp, ArrowDown, FileText, Menu, X as CloseIcon,
     Stethoscope, Heart, Scissors, Brain, Sparkles, User, FlaskConical, 
-    Bone, HeartPulse, Microscope, Printer, Calendar as CalendarIcon
+    Bone, HeartPulse, Microscope, Printer, Calendar as CalendarIcon, Settings,
+    ChevronDown, Check
 } from "lucide-react";
 import Image from "next/image";
 import PatientModal from "@/components/PatientModal";
 import ReportModal from "@/components/ReportModal";
 import LgpdModal from "@/components/LgpdModal";
 import CalendarView from "@/components/CalendarView";
-import { Patient, PatientStatus } from "../types";
-import { getPatients } from "./actions";
+import ProfileModal from "@/components/ProfileModal";
+import { Patient, PatientStatus, FieldSchema } from "../types";
+import { getPatientsAction as getPatients, updatePatientAction } from "./actions";
 import { logLgpdConsentAction } from "./staff-actions";
+import { getSchemaAction } from "./config-actions";
 
 type SortConfig = {
     key: keyof Patient | 'none';
@@ -30,13 +33,22 @@ export default function Dashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<"lista" | "kanban" | "calendar">("lista");
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+    const [selectedSistemas, setSelectedSistemas] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<PatientStatus[]>([]);
     const [utiFilter, setUtiFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'none', direction: 'asc' });
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [userRole, setUserRole] = useState<string>("");
-    const [userName, setUserName] = useState<string>("");
+    const [userName, setUserName] = useState("");
+    const [userFullName, setUserFullName] = useState("");
+    const [userRole, setUserRole] = useState("");
     const [showLgpdModal, setShowLgpdModal] = useState<boolean>(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [schema, setSchema] = useState<FieldSchema[]>([]);
+    const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+    const [visibleColumnIds, setVisibleColumnIds] = useState<Set<string>>(new Set([
+        'status', 'position', 'team', 'sistema', 'name', 'aihDate', 'surgeryDate'
+    ]));
+    const [columnOrder, setColumnOrder] = useState<string[]>([]);
 
     const teamIcons: Record<string, React.ElementType> = {
         "Geral (Todas)": Activity,
@@ -58,12 +70,33 @@ export default function Dashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [patientsData, configData] = await Promise.all([
+            const [patientsData, configData, schemaData] = await Promise.all([
                 getPatients(),
-                import('./config-actions').then(m => m.getConfig())
+                import('./config-actions').then(m => m.getConfig()),
+                getSchemaAction()
             ]);
             setPatients(patientsData);
             setConfig(configData);
+            setSchema(schemaData);
+            
+            // Try to load saved column preferences
+            const savedColumns = localStorage.getItem('visible_columns');
+            if (savedColumns) {
+                try {
+                    setVisibleColumnIds(new Set(JSON.parse(savedColumns)));
+                } catch (e) {
+                    console.error("Failed to parse saved columns");
+                }
+            }
+
+            const savedOrder = localStorage.getItem('column_order');
+            if (savedOrder) {
+                try {
+                    setColumnOrder(JSON.parse(savedOrder));
+                } catch (e) {
+                    console.error("Failed to parse saved column order");
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch data:", error);
         } finally {
@@ -90,6 +123,11 @@ export default function Dashboard() {
                 setShowLgpdModal(true);
             }
         }
+
+        const fullNameMatch = document.cookie.match(/fullname=([^;]+)/);
+        if (fullNameMatch) {
+            setUserFullName(decodeURIComponent(fullNameMatch[1]));
+        }
     }, []);
 
     const handleSort = (key: keyof Patient) => {
@@ -97,6 +135,57 @@ export default function Dashboard() {
             key,
             direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
+    };
+
+    const orderedVisibleFields = useMemo(() => {
+        const fields = schema.filter(f => visibleColumnIds.has(f.id));
+        if (columnOrder.length > 0) {
+            fields.sort((a, b) => {
+                const idxA = columnOrder.indexOf(a.id);
+                const idxB = columnOrder.indexOf(b.id);
+                if (idxA === -1 && idxB === -1) return a.order - b.order;
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+        } else {
+            fields.sort((a, b) => a.order - b.order);
+        }
+        return fields;
+    }, [schema, visibleColumnIds, columnOrder]);
+
+    const handleColumnDragStart = (e: DragEvent, id: string) => {
+        e.dataTransfer.setData('text/plain', id);
+    };
+
+    const handleColumnDrop = (e: DragEvent, targetId: string) => {
+        const sourceId = e.dataTransfer.getData('text/plain');
+        if (!sourceId || sourceId === targetId) return;
+
+        let newOrder = [...columnOrder];
+        if (newOrder.length === 0) {
+            newOrder = orderedVisibleFields.map(f => f.id);
+        } else {
+            const missing = orderedVisibleFields.map(f => f.id).filter(id => !newOrder.includes(id));
+            if (missing.length > 0) {
+                newOrder = [...newOrder, ...missing];
+            }
+        }
+
+        const sourceIdx = newOrder.indexOf(sourceId);
+        const targetIdx = newOrder.indexOf(targetId);
+
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+            const [removed] = newOrder.splice(sourceIdx, 1);
+            newOrder.splice(targetIdx, 0, removed);
+            setColumnOrder(newOrder);
+            localStorage.setItem('column_order', JSON.stringify(newOrder));
+        }
+    };
+
+    const handleColumnDragOver = (e: DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
     };
 
     const handleLgpdAccept = async () => {
@@ -128,18 +217,39 @@ export default function Dashboard() {
             // Update local state for immediate feedback
             setPatients(prev => prev.map(p => p.id === patientId ? updatedPatient : p));
             console.log(`Moved patient ${patientId} to ${newStatus}`);
+            
+            // Perist to backend
+            try {
+                const res = await updatePatientAction(updatedPatient);
+                if (!res.success) {
+                    console.error("Erro ao salvar o status");
+                    // Reverte se falhar
+                    setPatients(prev => prev.map(p => p.id === patientId ? patient : p));
+                }
+            } catch(e) {
+                console.error(e);
+                setPatients(prev => prev.map(p => p.id === patientId ? patient : p));
+            }
         }
     };
 
     const filteredPatients = useMemo(() => {
         const result = patients.filter((p) => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.medicalRecord.includes(searchTerm) ||
-                (p.city && p.city.toLowerCase().includes(searchTerm.toLowerCase()));
-            const matchesTeam = selectedTeams.length === 0 || selectedTeams.includes(p.team);
-            const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(p.status);
+            const searchLower = searchTerm.toLowerCase();
+            const matchesSearch = searchTerm === "" || Object.values(p).some(value => {
+                if (typeof value === 'string' || typeof value === 'number') {
+                    return String(value).toLowerCase().includes(searchLower);
+                }
+                if (Array.isArray(value)) {
+                    return value.some(v => String(v).toLowerCase().includes(searchLower));
+                }
+                return false;
+            });
+            const matchesTeam = selectedTeams.length === 0 || selectedTeams.includes(String(p.team || ""));
+            const matchesSistema = selectedSistemas.length === 0 || selectedSistemas.includes(String(p.sistema || ""));
+            const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes((p.status as PatientStatus) || "SEM STATUS");
             const matchesUti = utiFilter === 'Todos' || p.needsICU === utiFilter;
-            return matchesSearch && matchesTeam && matchesStatus && matchesUti;
+            return matchesSearch && matchesTeam && matchesSistema && matchesStatus && matchesUti;
         });
 
         // Always prioritize Priority 1, then 2, then 3
@@ -149,7 +259,7 @@ export default function Dashboard() {
             
             // Force Priority 1 > 2 > 3
             if (prioA !== prioB) {
-                return prioA.localeCompare(prioB);
+                return String(prioA).localeCompare(String(prioB));
             }
             
             // Secondary sort by sortConfig if active
@@ -157,20 +267,29 @@ export default function Dashboard() {
                 const key = sortConfig.key as keyof Patient;
                 const aVal = String(a[key] || "");
                 const bVal = String(b[key] || "");
-                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return sortConfig.direction === 'asc' 
+                    ? aVal.localeCompare(bVal) 
+                    : bVal.localeCompare(aVal);
             }
             return 0;
         });
 
         return result;
-    }, [searchTerm, selectedTeams, selectedStatuses, utiFilter, sortConfig, patients]);
+    }, [searchTerm, selectedTeams, selectedSistemas, selectedStatuses, utiFilter, sortConfig, patients]);
 
     const stats = useMemo(() => {
         const base = patients.filter(p => {
-             const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.medicalRecord.includes(searchTerm);
-            const matchesTeam = selectedTeams.length === 0 || selectedTeams.includes(p.team);
+             const searchLower = searchTerm.toLowerCase();
+             const matchesSearch = searchTerm === "" || Object.values(p).some(value => {
+                 if (typeof value === 'string' || typeof value === 'number') {
+                     return String(value).toLowerCase().includes(searchLower);
+                 }
+                 if (Array.isArray(value)) {
+                     return value.some(v => String(v).toLowerCase().includes(searchLower));
+                 }
+                 return false;
+             });
+            const matchesTeam = selectedTeams.length === 0 || selectedTeams.includes(String(p.team || ""));
             return matchesSearch && matchesTeam;
         });
         
@@ -179,9 +298,10 @@ export default function Dashboard() {
             { label: "AGENDADOS", type: 'AGENDADOS' as PatientStatus, count: base.filter(p => p.status === 'AGENDADOS').length, utiCount: base.filter(p => p.status === 'AGENDADOS' && p.needsICU === 'Sim').length, color: "text-blue-600", bg: "bg-blue-50", border: 'border-blue-400' },
             { label: "PRONTOS", type: 'PRONTOS' as PatientStatus, count: base.filter(p => p.status === 'PRONTOS').length, utiCount: base.filter(p => p.status === 'PRONTOS' && p.needsICU === 'Sim').length, color: "text-emerald-600", bg: "bg-emerald-50", border: 'border-emerald-400' },
             { label: "OBSERVAÇÕES\nPENDÊNCIAS", type: 'OBSERVAÇÕES/PENDÊNCIAS' as PatientStatus, count: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS').length, utiCount: base.filter(p => p.status === 'OBSERVAÇÕES/PENDÊNCIAS' && p.needsICU === 'Sim').length, color: "text-rose-600", bg: "bg-rose-50", border: 'border-rose-400' },
+            { label: "DISCUTIR\nEM ROUND", type: 'DISCUTIR EM ROUND' as PatientStatus, count: base.filter(p => p.status === 'DISCUTIR EM ROUND').length, utiCount: base.filter(p => p.status === 'DISCUTIR EM ROUND' && p.needsICU === 'Sim').length, color: "text-yellow-600", bg: "bg-yellow-50", border: 'border-yellow-400' },
             { label: "SEM STATUS", type: 'SEM STATUS' as PatientStatus, count: base.filter(p => p.status === 'SEM STATUS').length, utiCount: base.filter(p => p.status === 'SEM STATUS' && p.needsICU === 'Sim').length, color: "text-slate-800", bg: "bg-slate-50", border: 'border-slate-300' },
             { label: "CIRURGIA REALIZADA", type: 'CIRURGIA REALIZADA' as PatientStatus, count: base.filter(p => p.status === 'CIRURGIA REALIZADA').length, utiCount: base.filter(p => p.status === 'CIRURGIA REALIZADA' && p.needsICU === 'Sim').length, color: "text-orange-500", bg: "bg-orange-50", border: 'border-orange-400' },
-            { label: "PERDA DE SEGMENTO", type: 'PERDA DE SEGMENTO' as PatientStatus, count: base.filter(p => p.status === 'PERDA DE SEGMENTO').length, utiCount: base.filter(p => p.status === 'PERDA DE SEGMENTO' && p.needsICU === 'Sim').length, color: "text-[#78350f]", bg: "bg-[#fef3c7]", border: 'border-[#78350f]' },
+            { label: "PERDA DE SEGUIMENTO", type: 'PERDA DE SEGUIMENTO' as PatientStatus, count: base.filter(p => p.status === 'PERDA DE SEGUIMENTO').length, utiCount: base.filter(p => p.status === 'PERDA DE SEGUIMENTO' && p.needsICU === 'Sim').length, color: "text-[#78350f]", bg: "bg-[#fef3c7]", border: 'border-[#78350f]' },
         ];
     }, [patients, searchTerm, selectedTeams]);
 
@@ -189,9 +309,10 @@ export default function Dashboard() {
         switch (status) {
             case "PRONTOS": return "bg-emerald-500 text-white";
             case "OBSERVAÇÕES/PENDÊNCIAS": return "bg-rose-500 text-white";
+            case "DISCUTIR EM ROUND": return "bg-yellow-500 text-white";
             case "AGENDADOS": return "bg-blue-500 text-white";
             case "CIRURGIA REALIZADA": return "bg-orange-500 text-white";
-            case "PERDA DE SEGMENTO": return "bg-[#78350f] text-white";
+            case "PERDA DE SEGUIMENTO": return "bg-[#78350f] text-white";
             case "SEM STATUS": return "bg-slate-400 text-white";
             default: return "bg-slate-400 text-white";
         }
@@ -215,21 +336,60 @@ export default function Dashboard() {
     }
 };
 
-const renderDate = (dateStr: string | undefined) => {
-    if (!dateStr || dateStr === '--' || dateStr.trim() === '') return '--';
-    
-    // If it's in YYYY-MM-DD format (ISO), convert to DD/MM/YYYY
-    if (dateStr.includes('-')) {
+    const renderDate = (dateStr: string) => {
+        if (!dateStr || dateStr === '--') return '--';
+        // Convert YYYY-MM-DD to DD/MM/YYYY
         const parts = dateStr.split('-');
-        if (parts.length === 3 && parts[0].length === 4) {
+        if (parts.length === 3) {
             return `${parts[2]}/${parts[1]}/${parts[0]}`;
         }
-    }
-    
-    return dateStr;
-};
+        return dateStr;
+    };
 
-    const SortIcon = ({ column }: { column: keyof Patient }) => {
+    const renderTableCell = (patient: Patient, field: FieldSchema) => {
+        const value = patient[field.id as keyof Patient];
+        
+        if (field.id === 'status') {
+            return (
+                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-wide inline-block min-w-[100px] text-center ${getStatusStyle(String(value || 'SEM STATUS') as PatientStatus)}`}>
+                    {String(value || 'SEM STATUS')}
+                </span>
+            );
+        }
+
+        if (field.id === 'position') {
+            return (
+                <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">{String(value || '--')}</span>
+            );
+        }
+
+        if (field.id === 'name') {
+            return (
+                <div className="flex flex-col">
+                    <span className="text-sm transition-colors text-black font-semibold">
+                        {String(value || '--')}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">{patient.medicalRecord}</span>
+                </div>
+            );
+        }
+
+        if (field.type === 'date') {
+            return (
+                <span className="text-[10px] text-black uppercase font-medium">
+                    {renderDate(String(value || '--'))}
+                </span>
+            );
+        }
+
+        return (
+            <span className={`text-black uppercase ${field.type === 'number' ? 'font-mono text-xs' : 'text-[10px] font-medium'}`}>
+                {String(value || '--')}
+            </span>
+        );
+    };
+
+    const SortIcon = ({ column }: { column: string }) => {
         if (sortConfig.key !== column) return <ArrowUpDown size={12} className="ml-1 opacity-20 group-hover:opacity-100 transition-opacity" />;
         return sortConfig.direction === 'asc' ? <ArrowUp size={12} className="ml-1 text-blue-600" /> : <ArrowDown size={12} className="ml-1 text-blue-600" />;
     };
@@ -301,40 +461,88 @@ const renderDate = (dateStr: string | undefined) => {
                             </button>
                         )}
                     </div>
-                    {config.teams.map((team) => {
+                    {[...config.teams].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((team) => {
                         const Icon = teamIcons[team] || Stethoscope;
                         const isSelected = selectedTeams.includes(team);
+                        // Get unique systems present in this team's patients
+                        const teamSistemas = [...new Set(
+                            patients
+                                .filter(p => p.team === team && p.sistema && String(p.sistema).trim() !== '')
+                                .map(p => String(p.sistema))
+                        )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
                         return (
-                            <button
-                                key={team}
-                                onClick={() => {
-                                    setSelectedTeams(prev => 
-                                        prev.includes(team) 
-                                            ? prev.filter(t => t !== team)
-                                            : [...prev, team]
-                                    );
-                                }}
-                                title={`Filtrar por ${team}`}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
-                                    isSelected ? "bg-[#d4af37] text-[#0a1f44] shadow-md font-bold" : "text-slate-300 hover:bg-white/5"
-                                }`}
-                            >
-                                <div className="flex items-center gap-2 truncate">
-                                    <Icon size={16} className={isSelected ? "text-[#0a1f44]" : "text-slate-400"} />
-                                    <span className="truncate">{team}</span>
-                                </div>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                                    isSelected ? "bg-[#0a1f44]/10" : "bg-white/10 text-slate-400"
-                                }`}>
-                                    {patients.filter(p => p.team === team).length}
-                                </span>
-                            </button>
+                            <div key={team}>
+                                <button
+                                    onClick={() => {
+                                        setSelectedTeams(prev => 
+                                            prev.includes(team) 
+                                                ? prev.filter(t => t !== team)
+                                                : [...prev, team]
+                                        );
+                                        // Clear sistema sub-filter when deselecting team
+                                        if (selectedTeams.includes(team)) {
+                                            setSelectedSistemas([]);
+                                        }
+                                    }}
+                                    title={`Filtrar por ${team}`}
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
+                                        isSelected ? "bg-[#d4af37] text-[#0a1f44] shadow-md font-bold" : "text-slate-300 hover:bg-white/5"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2 truncate">
+                                        <Icon size={16} className={isSelected ? "text-[#0a1f44]" : "text-slate-400"} />
+                                        <span className="truncate">{team}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                        isSelected ? "bg-[#0a1f44]/10" : "bg-white/10 text-slate-400"
+                                    }`}>
+                                        {patients.filter(p => p.team === team).length}
+                                    </span>
+                                </button>
+
+                                {/* Sistema submenu - shown when team is selected and has systems */}
+                                {isSelected && teamSistemas.length > 0 && (
+                                    <div className="ml-4 mt-0.5 mb-1 space-y-0.5 border-l border-white/10 pl-2">
+                                        {teamSistemas.map(sistema => {
+                                            const isSistemaSelected = selectedSistemas.includes(sistema);
+                                            const count = patients.filter(p => p.team === team && p.sistema === sistema).length;
+                                            return (
+                                                <button
+                                                    key={sistema}
+                                                    onClick={() => setSelectedSistemas(prev =>
+                                                        prev.includes(sistema)
+                                                            ? prev.filter(s => s !== sistema)
+                                                            : [...prev, sistema]
+                                                    )}
+                                                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${
+                                                        isSistemaSelected
+                                                            ? 'bg-blue-500/20 text-blue-300 font-bold'
+                                                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                                                    }`}
+                                                >
+                                                    <span className="truncate">{sistema}</span>
+                                                    <span className="text-[9px] font-bold bg-white/10 px-1 rounded-full ml-1 shrink-0">{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
 
                 </nav>
                 
                 <div className="p-4 mt-auto border-t border-white/5 space-y-1">
+                    <button 
+                        onClick={() => setIsProfileOpen(true)}
+                        className="w-full flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2 px-3 rounded-lg transition-all"
+                        title="Configurações de Perfil"
+                    >
+                        <User size={14} />
+                        <span className="font-bold uppercase tracking-wider">Meu Perfil</span>
+                    </button>
+
                     <button 
                         onClick={fetchData} 
                         aria-label="Sincronizar dados"
@@ -349,6 +557,7 @@ const renderDate = (dateStr: string | undefined) => {
                         onClick={() => {
                             document.cookie = "auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                             document.cookie = "role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                            document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                             window.location.href = "/login";
                         }}
                         className="w-full flex items-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs py-2 px-3 rounded-lg transition-all mt-2"
@@ -376,9 +585,9 @@ const renderDate = (dateStr: string | undefined) => {
                             >
                                 <Menu size={20} />
                             </button>
-                            <div className="flex flex-col lg:flex-row lg:items-center lg:gap-2 overflow-hidden">
+                            <div className="flex flex-col overflow-hidden">
                                 <span className="text-xs sm:text-sm lg:text-lg font-black text-slate-900 uppercase">
-                                    OLÁ, {userName || userRole || 'NOME'}
+                                    OLÁ, {userFullName || userName || userRole || 'NOME'}
                                 </span>
                             </div>
                         </div>
@@ -419,25 +628,8 @@ const renderDate = (dateStr: string | undefined) => {
                     </div>
 
                     {/* Linha 2: Filtros e Visualização */}
-                    <div className="h-14 flex items-center justify-between px-4 lg:px-8 bg-slate-50/30 overflow-x-auto no-scrollbar gap-4">
+                    <div className="h-14 flex items-center justify-between px-4 lg:px-8 bg-slate-50/30 overflow-x-auto lg:overflow-visible no-scrollbar gap-4">
                         <div className="flex items-center gap-4">
-                            {/* UTI Filter */}
-                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/60 shadow-sm">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">UTI</span>
-                                <div className="flex bg-slate-100/50 rounded-lg p-0.5">
-                                    {(['Todos', 'Sim', 'Não'] as const).map((opt) => (
-                                        <button
-                                            key={opt}
-                                            onClick={() => setUtiFilter(opt)}
-                                            className={`px-4 py-1 rounded-md text-[10px] font-black transition-all ${
-                                                utiFilter === opt ? 'bg-[#0a1f44] text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
-                                            }`}
-                                        >
-                                            {opt.toUpperCase()}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
 
                             {/* View Toggle */}
                             <div className="flex items-center bg-white p-1 rounded-xl border border-slate-200/60 shadow-sm">
@@ -470,16 +662,73 @@ const renderDate = (dateStr: string | undefined) => {
                                 </button>
                             </div>
                         </div>
+                              {/* Header Actions */}
+                        <div className="flex items-center gap-3">
+                            {/* Column Toggle */}
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setIsColumnMenuOpen(!isColumnMenuOpen)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-all border shadow-sm active:scale-95 ${
+                                        isColumnMenuOpen ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                                    }`}
+                                >
+                                    <Settings size={16} className={isColumnMenuOpen ? "animate-spin-slow" : ""} />
+                                    <span>Colunas</span>
+                                    <ChevronDown size={14} className={`transition-transform duration-200 ${isColumnMenuOpen ? "rotate-180" : ""}`} />
+                                </button>
 
-                        {/* Report Button */}
-                        <button 
-                            onClick={() => setIsReportOpen(true)}
-                            className="flex items-center gap-2 bg-white border border-slate-200/80 text-slate-700 px-6 py-2 rounded-xl text-sm font-black shadow-sm hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 group"
-                            title="Gerar Relatório Personalizado"
-                        >
-                            <Printer size={18} className="group-hover:scale-110 transition-transform" />
-                            <span>Relatório</span>
-                        </button>
+                                {isColumnMenuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsColumnMenuOpen(false)} />
+                                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 py-3 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="px-4 py-2 border-b border-slate-50 mb-2">
+                                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Colunas Visíveis</span>
+                                            </div>
+                                            <div className="max-h-[300px] overflow-y-auto px-2 space-y-0.5">
+                                                {schema
+                                                    .filter(f => !f.isSystem || f.id === 'name')
+                                                    .sort((a, b) => a.order - b.order)
+                                                    .map(field => {
+                                                        const isVisible = visibleColumnIds.has(field.id);
+                                                        return (
+                                                            <button
+                                                                key={field.id}
+                                                                onClick={() => {
+                                                                    const newIds = new Set(visibleColumnIds);
+                                                                    if (isVisible) newIds.delete(field.id);
+                                                                    else newIds.add(field.id);
+                                                                    setVisibleColumnIds(newIds);
+                                                                    localStorage.setItem('visible_columns', JSON.stringify(Array.from(newIds)));
+                                                                }}
+                                                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${isVisible ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                            >
+                                                                <span className="text-xs uppercase tracking-tight">{field.label}</span>
+                                                                {isVisible ? (
+                                                                    <div className="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                                                        <Check size={12} className="text-white" strokeWidth={4} />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="w-5 h-5 border-2 border-slate-200 rounded-lg" />
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Report Button */}
+                            <button 
+                                onClick={() => setIsReportOpen(true)}
+                                className="flex items-center gap-2 bg-white border border-slate-200/80 text-slate-700 px-6 py-2 rounded-xl text-sm font-black shadow-sm hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95 group"
+                                title="Gerar Relatório Personalizado"
+                            >
+                                <FileText size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                <span>Relatórios</span>
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -509,9 +758,9 @@ const renderDate = (dateStr: string | undefined) => {
                                         (isSelected ? stat.border + ' ' + stat.bg + ' ring-4 ring-slate-200/50' : "bg-white border-transparent")
                                     }`}
                                 >
-                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'CIRURGIA REALIZADA' ? 'text-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'text-[#78350f]' : stat.label === 'PRONTOS' ? 'text-emerald-600' : stat.label.includes('OBSERVAÇÕES') ? 'text-rose-600' : 'text-slate-900')}`}>{stat.count}</span>
+                                    <span className={`text-lg sm:text-xl lg:text-2xl font-bold ${stat.isSummary ? 'text-white' : (stat.label === 'CIRURGIA REALIZADA' ? 'text-orange-500' : stat.label === 'PERDA DE SEGUIMENTO' ? 'text-[#78350f]' : stat.label === 'PRONTOS' ? 'text-emerald-600' : stat.label.includes('OBSERVAÇÕES') ? 'text-rose-600' : stat.label.includes('DISCUTIR') ? 'text-yellow-600' : 'text-slate-900')}`}>{stat.count}</span>
                                     <div className="flex items-center gap-1 sm:gap-2">
-                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${stat.label === 'CIRURGIA REALIZADA' ? 'bg-orange-500' : stat.label === 'PERDA DE SEGMENTO' ? 'bg-[#78350f]' : stat.label === 'PRONTOS' ? 'bg-emerald-500' : stat.label.includes('OBSERVAÇÕES') ? 'bg-rose-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
+                                        {!stat.isSummary && <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${stat.label === 'CIRURGIA REALIZADA' ? 'bg-orange-500' : stat.label === 'PERDA DE SEGUIMENTO' ? 'bg-[#78350f]' : stat.label === 'PRONTOS' ? 'bg-emerald-500' : stat.label.includes('OBSERVAÇÕES') ? 'bg-rose-500' : stat.label.includes('DISCUTIR') ? 'bg-yellow-500' : (stat.color === 'text-slate-800' ? 'bg-slate-400' : stat.bg.replace('50', '500'))}`} />}
                                         <span className={`text-[7px] sm:text-[8px] lg:text-[10px] font-bold uppercase tracking-wider whitespace-pre-line leading-tight ${stat.isSummary ? 'text-slate-300' : stat.color}`}>{stat.label}</span>
                                     </div>
                                 </div>
@@ -529,37 +778,29 @@ const renderDate = (dateStr: string | undefined) => {
                                 <table className="w-full text-left border-collapse min-w-[800px] lg:min-w-0">
                                     <thead>
                                         <tr className="bg-slate-50 border-b border-slate-200">
-                                            <th onClick={() => handleSort('status')} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Status <SortIcon column="status" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('team')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Equipe <SortIcon column="team" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('sistema')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Sistema <SortIcon column="sistema" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('preceptor')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Preceptor <SortIcon column="preceptor" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('name')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Nome <SortIcon column="name" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('aihDate')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">AIH <SortIcon column="aihDate" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('surgeryDate')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Cirurgia <SortIcon column="surgeryDate" /></div>
-                                            </th>
-                                            <th onClick={() => handleSort('resident')} className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors">
-                                                <div className="flex items-center">Residente <SortIcon column="resident" /></div>
-                                            </th>
+                                            {orderedVisibleFields.map(field => (
+                                                    <th 
+                                                        key={field.id}
+                                                        draggable
+                                                        onDragStart={(e) => handleColumnDragStart(e, field.id)}
+                                                        onDragOver={handleColumnDragOver}
+                                                        onDrop={(e) => handleColumnDrop(e, field.id)}
+                                                        onClick={() => handleSort(field.id as keyof Patient)} 
+                                                        className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group hover:bg-slate-100 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-1.5 pointer-events-none">
+                                                            {field.label} 
+                                                            <SortIcon column={field.id} />
+                                                        </div>
+                                                    </th>
+                                                ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {loading ? (
                                             Array.from({ length: 10 }).map((_, i) => (
                                                 <tr key={i} className="animate-pulse">
-                                                    <td colSpan={7} className="px-6 py-4 h-14 bg-slate-50/50" />
+                                                    <td colSpan={visibleColumnIds.size} className="px-6 py-4 h-14 bg-slate-50/50" />
                                                 </tr>
                                             ))
                                         ) : (
@@ -567,39 +808,13 @@ const renderDate = (dateStr: string | undefined) => {
                                                 <tr 
                                                     key={patient.id} 
                                                     onClick={() => { setSelectedPatient(patient); setIsModalOpen(true); }}
-                                                    className={`transition-colors cursor-pointer group ${getRowPriorityClass(patient.priority)}`}
+                                                    className={`transition-colors cursor-pointer group ${getRowPriorityClass(String(patient.priority || '3'))}`}
                                                 >
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-wide inline-block min-w-[100px] text-center ${getStatusStyle(patient.status)}`}>
-                                                            {patient.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-xs text-black uppercase">
-                                                        {patient.team}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-[10px] text-black uppercase">
-                                                        {patient.sistema}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-xs text-black uppercase">
-                                                        {patient.preceptor || '--'}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm transition-colors text-black">
-                                                                {patient.name}
-                                                            </span>
-                                                            <span className="text-[10px] text-slate-500 font-mono">{patient.medicalRecord}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-[10px] text-black uppercase">
-                                                        {renderDate(patient.aihDate)}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm text-black">
-                                                        {renderDate(patient.surgeryDate)}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-xs text-black uppercase">
-                                                        {patient.resident || '--'}
-                                                    </td>
+                                                    {orderedVisibleFields.map(field => (
+                                                             <td key={field.id} className="px-6 py-4">
+                                                                 {renderTableCell(patient, field)}
+                                                             </td>
+                                                         ))}
                                                 </tr>
                                             ))
                                         )}
@@ -625,8 +840,8 @@ const renderDate = (dateStr: string | undefined) => {
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-2 sm:mb-4">
-                                                <span className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-black tracking-wide ${getStatusStyle(patient.status)}`}>
-                                                    {patient.status}
+                                                <span className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-black tracking-wide ${getStatusStyle(String(patient.status || 'SEM STATUS') as PatientStatus)}`}>
+                                                    {String(patient.status || 'SEM STATUS')}
                                                 </span>
                                                 <div className={`p-1 sm:p-1.5 rounded-lg ${patient.priority === '1' ? 'bg-red-50 text-red-600' : patient.priority === '2' ? 'bg-yellow-50 text-yellow-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                                     <Activity size={14} className="sm:hidden" />
@@ -641,24 +856,28 @@ const renderDate = (dateStr: string | undefined) => {
 
                                             <div className="flex flex-col gap-1 sm:gap-2 pt-2 sm:pt-4 border-t border-slate-50">
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Posição</span>
+                                                    <span className="text-[10px] sm:text-xs font-black text-blue-600">{String(patient.position || '--')}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipe / Sistema</span>
                                                     <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.team} <span className="text-slate-300 mx-1">•</span> {patient.sistema}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data AIH</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(patient.aihDate)}</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(String(patient.aihDate || ''))}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Cirurgia</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(patient.surgeryDate)}</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(String(patient.surgeryDate || ''))}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Preceptor</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.preceptor || '--'}</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{String(patient.preceptor || '--')}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Residente</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.resident || '--'}</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{String(patient.resident || '--')}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -674,10 +893,10 @@ const renderDate = (dateStr: string | undefined) => {
                              )}
                         </>
                     ) : (
-                        <div className="flex gap-4 sm:gap-6 min-w-full pb-4">
+                        <div className="flex gap-4 sm:gap-6 pb-6 overflow-x-auto no-scrollbar snap-x snap-mandatory lg:snap-none -mx-4 px-4 sm:mx-0 sm:px-0">
                             {(selectedStatuses.length > 0
-                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGMENTO"].filter(s => selectedStatuses.includes(s as PatientStatus))
-                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGMENTO"]
+                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"].filter(s => selectedStatuses.includes(s as PatientStatus))
+                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"]
                             ).map((status) => {
                                 const colPatients = filteredPatients.filter(p => p.status === status);
                                 return (
@@ -685,38 +904,43 @@ const renderDate = (dateStr: string | undefined) => {
                                     key={status} 
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, status as PatientStatus)}
-                                    className="w-80 flex-shrink-0 bg-slate-100 rounded-xl p-4 flex flex-col gap-4 border-2 border-transparent transition-colors hover:border-blue-200"
+                                    className="w-[280px] sm:w-80 flex-shrink-0 bg-slate-100 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 border-2 border-transparent transition-colors hover:border-blue-200 snap-center"
                                 >
                                     <div className="flex items-center justify-between px-1">
-                                        <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">{status}</h3>
-                                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        <h3 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">{status}</h3>
+                                        <span className="bg-white/50 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-slate-200/50">
                                             {colPatients.length}
                                         </span>
                                     </div>
-                                    <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                                    <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
                                         {colPatients.map((p) => (
                                             <div 
                                                 key={p.id} 
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, p.id)}
                                                 onClick={() => { setSelectedPatient(p); setIsModalOpen(true); }}
-                                                className={`bg-white p-4 rounded-lg shadow-sm border-l-4 border-y border-r border-slate-200 cursor-grab active:cursor-grabbing hover:border-blue-400 transition-colors group ${
-                                                    p.priority === '1' ? 'border-l-red-500' :
-                                                    p.priority === '2' ? 'border-l-yellow-500' :
+                                                className={`bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-slate-200 cursor-grab active:cursor-grabbing hover:border-blue-400 transition-all hover:shadow-md active:scale-[0.98] group ${
+                                                    String(p.priority || '3') === '1' ? 'border-l-red-500' :
+                                                    String(p.priority || '3') === '2' ? 'border-l-yellow-500' :
                                                     'border-l-emerald-500'
                                                 }`}
                                             >
-                                                <p className={`text-xs font-bold mb-1 truncate ${getPriorityStyle(p.priority)}`}>{p.name}</p>
+                                                <p className={`text-xs font-bold mb-1 truncate ${getPriorityStyle(String(p.priority || '3'))}`}>{p.name}</p>
                                                 <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
-                                                    <span>{p.team}</span>
-                                                    <span>{p.medicalRecord}</span>
+                                                    <span className="truncate max-w-[120px]">{p.team}</span>
+                                                    <span className="font-mono">{p.medicalRecord}</span>
                                                 </div>
-                                                <div className="mt-2 flex items-center justify-between">
-                                                    <span className="text-[8px] bg-slate-50 px-1.5 py-0.5 rounded text-slate-400 font-bold uppercase">
-                                                        {p.sistema}
-                                                    </span>
+                                                <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-50">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[8px] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded text-blue-600 font-black">
+                                                            #{String(p.position || '--')}
+                                                        </span>
+                                                        <span className="text-[8px] bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400 font-black uppercase tracking-tighter">
+                                                            {String(p.sistema || '--')}
+                                                        </span>
+                                                    </div>
                                                     {p.examPdfPath && (
-                                                        <FileText size={12} className="text-sky-500" />
+                                                        <FileText size={12} className="text-blue-500" />
                                                     )}
                                                 </div>
                                             </div>
@@ -756,6 +980,10 @@ const renderDate = (dateStr: string | undefined) => {
                     onAccept={handleLgpdAccept}
                 />
             )}
+            <ProfileModal 
+                isOpen={isProfileOpen} 
+                onClose={() => setIsProfileOpen(false)} 
+            />
         </div>
     );
 }

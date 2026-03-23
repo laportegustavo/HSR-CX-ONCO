@@ -1,4 +1,4 @@
-import { createPatientAction, getPatients, deletePatientAction } from '../src/app/actions';
+import { createPatientAction, getPatientsAction as getPatients, deletePatientAction } from '../src/app/actions';
 import { addTeamAction, addSystemAction, getConfig } from '../src/app/config-actions';
 import { saveStaffAction, getStaff } from '../src/app/staff-actions';
 

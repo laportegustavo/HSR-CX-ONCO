@@ -1,0 +1,121 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { 
+    Search, Activity, RefreshCw, LayoutList, LayoutGrid, Plus, Users, 
+    ArrowUpDown, ArrowUp, ArrowDown, FileText, Menu, X as CloseIcon,
+    Stethoscope, Heart, Scissors, Brain, Sparkles, User, FlaskConical, 
+    Bone, HeartPulse, Microscope, Printer, Calendar as CalendarIcon, Settings,
+    ChevronDown, Check
+} from "lucide-react";
+import Image from "next/image";
+import PatientModal from "@/components/PatientModal";
+import ReportModal from "@/components/ReportModal";
+import LgpdModal from "@/components/LgpdModal";
+import CalendarView from "@/components/CalendarView";
+import ProfileModal from "@/components/ProfileModal";
+import { Patient, PatientStatus, FieldSchema } from "../types";
+import { getPatientsAction as getPatients } from "./actions";
+import { logLgpdConsentAction } from "./staff-actions";
+import { getSchemaAction } from "./config-actions";
+
+type SortConfig = {
+    key: keyof Patient | 'none';
+    direction: 'asc' | 'desc';
+};
+
+export default function Dashboard() {
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isReportOpen, setIsReportOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [viewMode, setViewMode] = useState<"lista" | "kanban" | "calendar">("lista");
+    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+    const [selectedStatuses, setSelectedStatuses] = useState<PatientStatus[]>([]);
+    const [utiFilter, setUtiFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos');
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'none', direction: 'asc' });
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [userRole, setUserRole] = useState<string>("");
+    const [userName, setUserName] = useState<string>("");
+    const [showLgpdModal, setShowLgpdModal] = useState<boolean>(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [schema, setSchema] = useState<FieldSchema[]>([]);
+    const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+    const [visibleColumnIds, setVisibleColumnIds] = useState<Set<string>>(new Set([
+        'status', 'position', 'team', 'sistema', 'name', 'aihDate', 'surgeryDate'
+    ]));
+
+    const teamIcons: Record<string, React.ElementType> = {
+        "Geral (Todas)": Activity,
+        "Gastroenterologia": Heart,
+        "Ortopedia": Bone,
+        "Urologia": FlaskConical,
+        "Ginecologia": User,
+        "Cirurgia Geral": Scissors,
+        "Neurocirurgia": Brain,
+        "Cirurgia Plástica": Sparkles,
+        "Cardiologia": HeartPulse,
+        "Otorrinolaringologia": Microscope,
+        "Oncologia": Microscope,
+        "N/A": Stethoscope
+    };
+
+    const [config, setConfig] = useState<{ teams: string[], systems: string[] }>({ teams: [], systems: [] });
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [patientsData, configData, schemaData] = await Promise.all([
+                getPatients(),
+                import('./config-actions').then(m => m.getConfig()),
+                getSchemaAction()
+            ]);
+            setPatients(patientsData);
+            setConfig(configData);
+            setSchema(schemaData);
+            
+            // Try to load saved column preferences
+            const savedColumns = localStorage.getItem('visible_columns');
+            if (savedColumns) {
+                try {
+                    setVisibleColumnIds(new Set(JSON.parse(savedColumns)));
+                } catch (e) {
+                    console.error("Failed to parse saved columns");
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+        // Get role from cookies
+        const roleMatch = document.cookie.match(/role=([^;]+)/);
+        if (roleMatch) {
+            setUserRole(decodeURIComponent(roleMatch[1]));
+        }
+        
+        const nameMatch = document.cookie.match(/username=([^;]+)/);
+        if (nameMatch) {
+            const decodedName = decodeURIComponent(nameMatch[1]);
+            setUserName(decodedName);
+            
+            // LGPD Check
+            const lgpdAccepted = localStorage.getItem(`lgpd_accepted_${decodedName}`);
+            if (!lgpdAccepted) {
+                setShowLgpdModal(true);
+            }
+        }
+    }, []);
+
+    const handleSort = (key: keyof Patient) => {
+        setSortConfig((prev) => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };

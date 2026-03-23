@@ -1,11 +1,15 @@
 'use server';
 
-import { getConfigFromSheet, saveConfigToSheet } from '../lib/google-sheets';
+import { getConfigFromSheet, saveConfigToSheet, getFieldSchema } from '../lib/google-sheets';
 import { getPatientsFromSheet, savePatientsToSheet } from '../lib/google-sheets';
 import { getStaffFromSheet, saveStaffToSheet } from '../lib/google-sheets';
 
 export async function getConfig() {
     return await getConfigFromSheet();
+}
+
+export async function getSchemaAction() {
+    return await getFieldSchema();
 }
 
 export async function saveConfigAction(config: { teams: string[], systems: string[] }) {

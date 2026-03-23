@@ -55,25 +55,25 @@ const getColumnLetter = (index: number): string => {
 const INITIAL_SCHEMA: FieldSchema[] = [
     { id: 'id', label: 'ID', type: 'text', column: 0, isVisibleInCalendar: false, isRequired: true, order: 0, isSystem: true },
     { id: 'name', label: 'Nome do Paciente', type: 'text', column: 1, isVisibleInCalendar: true, isRequired: true, order: 1, isSystem: true },
-    { id: 'birthDate', label: 'Data de Nascimento', type: 'date', column: 29, isVisibleInCalendar: false, isRequired: false, order: 2 },
-    { id: 'team', label: 'Equipe', type: 'select', column: 2, isVisibleInCalendar: true, isRequired: true, order: 3, options: [] },
-    { id: 'status', label: 'Status do Andamento', type: 'select', column: 3, isVisibleInCalendar: false, isRequired: true, order: 4 },
-    { id: 'sistema', label: 'Sistema', type: 'select', column: 4, isVisibleInCalendar: true, isRequired: true, order: 5, options: [] },
-    { id: 'medicalRecord', label: 'Prontuário', type: 'text', column: 5, isVisibleInCalendar: false, isRequired: false, order: 6 },
-    { id: 'aihDate', label: 'Data da AIH', type: 'date', column: 6, isVisibleInCalendar: false, isRequired: false, order: 7 },
-    { id: 'surgeryDate', label: 'Data da Cirurgia', type: 'date', column: 7, isVisibleInCalendar: false, isRequired: false, order: 8 },
-    { id: 'clinicalData', label: 'Dados Clínicos / Caso', type: 'textarea', column: 8, isVisibleInCalendar: false, isRequired: false, order: 9 },
-    { id: 'preceptor', label: 'Médico Preceptor', type: 'select', column: 9, isVisibleInCalendar: false, isRequired: false, order: 10, options: [] },
-    { id: 'resident', label: 'Médico Residente Principal', type: 'select', column: 10, isVisibleInCalendar: false, isRequired: false, order: 11, options: [] },
-    { id: 'caseDiscussion', label: 'Discussão do Caso', type: 'textarea', column: 11, isVisibleInCalendar: false, isRequired: false, order: 12 },
-    { id: 'contactPhone', label: 'Telefone de Contato', type: 'text', column: 12, isVisibleInCalendar: false, isRequired: false, order: 13 },
-    { id: 'preAnestheticEval', label: 'Avaliação Anestésica', type: 'textarea', column: 13, isVisibleInCalendar: false, isRequired: false, order: 14 },
-    { id: 'priority', label: 'Prioridade', type: 'select', column: 14, isVisibleInCalendar: false, isRequired: false, order: 15, options: ['1', '2', '3'] },
-    { id: 'age', label: 'Idade', type: 'text', column: 15, isVisibleInCalendar: false, isRequired: false, order: 16 },
-    { id: 'needsICU', label: 'Necessidade UTI', type: 'select', column: 16, isVisibleInCalendar: false, isRequired: false, order: 17, options: ['Sim', 'Não'] },
-    { id: 'latexAllergy', label: 'Alergia Latex', type: 'select', column: 17, isVisibleInCalendar: false, isRequired: false, order: 18, options: ['Sim', 'Não'] },
-    { id: 'jehovahsWitness', label: 'T. Jeová', type: 'select', column: 18, isVisibleInCalendar: false, isRequired: false, order: 19, options: ['Sim', 'Não'] },
-    { id: 'examPdfPath', label: 'PDF Exame', type: 'text', column: 19, isVisibleInCalendar: false, isRequired: false, order: 20 },
+    { id: 'position', label: 'Posição', type: 'number', column: 30, isVisibleInCalendar: false, isRequired: false, order: 2 },
+    { id: 'birthDate', label: 'Data de Nascimento', type: 'date', column: 29, isVisibleInCalendar: false, isRequired: false, order: 3 },
+    { id: 'age', label: 'Idade', type: 'text', column: 15, isVisibleInCalendar: false, isRequired: false, order: 4 },
+    { id: 'team', label: 'Equipe', type: 'select', column: 2, isVisibleInCalendar: true, isRequired: true, order: 5, options: [] },
+    { id: 'status', label: 'Status do Andamento', type: 'select', column: 3, isVisibleInCalendar: false, isRequired: true, order: 6 },
+    { id: 'sistema', label: 'Sistema', type: 'select', column: 4, isVisibleInCalendar: true, isRequired: true, order: 7, options: [] },
+    { id: 'medicalRecord', label: 'Prontuário', type: 'text', column: 5, isVisibleInCalendar: false, isRequired: false, order: 8 },
+    { id: 'aihDate', label: 'Data da AIH', type: 'date', column: 6, isVisibleInCalendar: false, isRequired: false, order: 9 },
+    { id: 'surgeryDate', label: 'Data da Cirurgia', type: 'date', column: 7, isVisibleInCalendar: false, isRequired: false, order: 10 },
+    { id: 'clinicalData', label: 'Dados Clínicos / Caso', type: 'textarea', column: 8, isVisibleInCalendar: false, isRequired: false, order: 11 },
+    { id: 'preceptor', label: 'Médico Preceptor', type: 'select', column: 9, isVisibleInCalendar: false, isRequired: false, order: 12, options: [] },
+    { id: 'resident', label: 'Médico Residente Principal', type: 'select', column: 10, isVisibleInCalendar: false, isRequired: false, order: 13, options: [] },
+    { id: 'caseDiscussion', label: 'Discussão do Caso', type: 'textarea', column: 11, isVisibleInCalendar: false, isRequired: false, order: 14 },
+    { id: 'contactPhone', label: 'Telefone de Contato', type: 'text', column: 12, isVisibleInCalendar: false, isRequired: false, order: 15 },
+    { id: 'preAnestheticEval', label: 'Avaliação Anestésica', type: 'textarea', column: 13, isVisibleInCalendar: false, isRequired: false, order: 16 },
+    { id: 'priority', label: 'Prioridade', type: 'select', column: 14, isVisibleInCalendar: false, isRequired: false, order: 17, options: ['1', '2', '3'] },
+    { id: 'needsICU', label: 'Necessidade UTI', type: 'select', column: 16, isVisibleInCalendar: false, isRequired: false, order: 18, options: ['Sim', 'Não'] },
+    { id: 'latexAllergy', label: 'Alergia Latex', type: 'select', column: 17, isVisibleInCalendar: false, isRequired: false, order: 19, options: ['Sim', 'Não'] },
+    { id: 'jehovahsWitness', label: 'T. Jeová', type: 'select', column: 18, isVisibleInCalendar: false, isRequired: false, order: 20, options: ['Sim', 'Não'] },
     { id: 'lastUpdated', label: 'Última Atualização', type: 'text', column: 20, isVisibleInCalendar: false, isRequired: false, order: 21, isSystem: true },
     { id: 'cpf', label: 'CPF', type: 'text', column: 21, isVisibleInCalendar: false, isRequired: false, order: 22 },
     { id: 'city', label: 'Cidade', type: 'text', column: 22, isVisibleInCalendar: false, isRequired: false, order: 23 },
@@ -85,7 +85,7 @@ const INITIAL_SCHEMA: FieldSchema[] = [
     { id: 'surgeryTime', label: 'Horário da Cirurgia', type: 'time', column: 28, isVisibleInCalendar: true, isRequired: false, order: 29 },
 ];
 
-async function ensureSheetExists(title: string, headers: string[]) {
+export async function ensureSheetExists(title: string, headers: string[]) {
     const sheets = getSheets();
     const spreadsheetId = getSpreadsheetId();
     
@@ -122,27 +122,42 @@ export async function getFieldSchema(): Promise<FieldSchema[]> {
         const sheets = getSheets();
         const spreadsheetId = getSpreadsheetId();
 
-        await ensureSheetExists('ConfigCampos', ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM"]);
+        await ensureSheetExists('ConfigCampos', ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM", "VISIBLE_FORM"]);
 
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'ConfigCampos!A2:I',
+            range: 'ConfigCampos!A2:J',
         });
 
         const rows = response.data.values;
-        if (!rows || rows.length === 0) return INITIAL_SCHEMA;
+        const finalSchema: FieldSchema[] = [...INITIAL_SCHEMA];
+        
+        if (rows && rows.length > 0) {
+            const sheetFields = rows.map(row => ({
+                id: row[0],
+                label: row[1],
+                type: row[2] as FieldType,
+                options: row[3] ? row[3].split(',').map((s: string) => s.trim()) : undefined,
+                column: parseInt(row[4]),
+                isVisibleInCalendar: row[5] === 'TRUE',
+                isRequired: row[6] === 'TRUE',
+                order: parseInt(row[7]),
+                isSystem: row[8] === 'TRUE',
+                isVisibleInForm: row[9] !== 'FALSE' // Padrao é TRUE caso vazio
+            }));
 
-        return rows.map(row => ({
-            id: row[0],
-            label: row[1],
-            type: row[2] as FieldType,
-            options: row[3] ? row[3].split(',').map((s: string) => s.trim()) : undefined,
-            column: parseInt(row[4]),
-            isVisibleInCalendar: row[5] === 'TRUE',
-            isRequired: row[6] === 'TRUE',
-            order: parseInt(row[7]),
-            isSystem: row[8] === 'TRUE'
-        })).sort((a, b) => a.order - b.order);
+            // Mesclar: Prioritize fields from sheet for matching IDs, but keep all from INITIAL_SCHEMA
+            sheetFields.forEach(sf => {
+                const idx = finalSchema.findIndex(f => f.id === sf.id);
+                if (idx !== -1) {
+                    finalSchema[idx] = sf;
+                } else {
+                    finalSchema.push(sf);
+                }
+            });
+        }
+
+        return finalSchema.sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (error) {
         console.error('Erro ao buscar esquema de campos:', error);
         return INITIAL_SCHEMA;
@@ -163,16 +178,17 @@ export async function saveFieldSchema(schema: FieldSchema[]): Promise<void> {
             f.isVisibleInCalendar ? 'TRUE' : 'FALSE',
             f.isRequired ? 'TRUE' : 'FALSE',
             f.order,
-            f.isSystem ? 'TRUE' : 'FALSE'
+            f.isSystem ? 'TRUE' : 'FALSE',
+            f.isVisibleInForm !== false ? 'TRUE' : 'FALSE'
         ]);
 
-        const header = ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM"];
+        const header = ["ID", "LABEL", "TYPE", "OPTIONS", "COLUMN", "VISIBLE_CALENDAR", "REQUIRED", "ORDER", "SYSTEM", "VISIBLE_FORM"];
         
         await ensureSheetExists('ConfigCampos', header);
 
         await sheets.spreadsheets.values.clear({
             spreadsheetId,
-            range: 'ConfigCampos!A:I'
+            range: 'ConfigCampos!A:J'
         });
 
         await sheets.spreadsheets.values.update({

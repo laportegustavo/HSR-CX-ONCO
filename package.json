@@ -16,7 +16,10 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "tesseract.js": "^7.0.0"
+    "recharts": "^3.8.0",
+    "sonner": "^2.0.7",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

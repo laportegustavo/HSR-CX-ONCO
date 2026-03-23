@@ -42,7 +42,9 @@ export default function LoginPage() {
                 
                 document.cookie = `auth=true; path=/; expires=${expiry.toUTCString()}`;
                 document.cookie = `role=${selectedRole}; path=/; expires=${expiry.toUTCString()}`;
-                document.cookie = `username=${encodeURIComponent(result.user?.fullName || username)}; path=/; expires=${expiry.toUTCString()}`;
+                document.cookie = `username=${encodeURIComponent(username)}; path=/; expires=${expiry.toUTCString()}`;
+                document.cookie = `fullname=${encodeURIComponent(result.user?.fullName || "")}; path=/; expires=${expiry.toUTCString()}`;
+                
                 
                 window.location.href = "/";
             } else {

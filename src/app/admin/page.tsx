@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import { 
     Users, UserPlus, Trash2, Save, ArrowLeft, 
     Stethoscope, ShieldCheck, Contact, Plus, UserCircle,
-    Layers, ArrowUp, ArrowDown, Settings2
+    Layers, ArrowUp, ArrowDown, Settings2, TrendingUp, Loader2, LayoutDashboard,
+    Cloud, Lock, Database, CheckCircle2
 } from 'lucide-react';
 import { MedicalStaff, Patient } from '@/types';
 import { getStaff, saveStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
-import { getPatients, deletePatientAction, getPatientChangeLogsAction } from '../actions';
+import { getPatientChangeLogsAction, getPatientsAction, deletePatientAction, recalculateAllPositionsAction } from "../actions";
+import DashboardStats from "@/components/DashboardStats";
 import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction, addHospitalAction, deleteHospitalAction, updateHospitalAction } from '../config-actions';
 import PatientModal from '@/components/PatientModal';
 import FieldManager from '@/components/FieldManager';
 import Image from 'next/image';
+import { exportPatientsToExcel, downloadBackupAsJson } from '@/utils/export-utils';
 
 export default function AdminDashboard() {
     const [staff, setStaff] = useState<MedicalStaff[]>([]);
@@ -22,7 +25,7 @@ export default function AdminDashboard() {
     const [newTeam, setNewTeam] = useState("");
     const [newSystem, setNewSystem] = useState("");
     const [newHospital, setNewHospital] = useState("");
-    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos' | 'fields'>('staff');
+    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos' | 'fields' | 'stats' | 'settings'>('staff');
     const [patients, setPatients] = useState<Patient[]>([]);
     const [accessLogs, setAccessLogs] = useState<{ timestamp: string, username: string, role: string }[]>([]);
     const [changeLogs, setChangeLogs] = useState<{ timestamp: string, user: string, patientId: string, patientName: string, field: string, oldValue: string, newValue: string }[]>([]);
@@ -59,7 +62,7 @@ export default function AdminDashboard() {
             const [staffData, configData, patientsData, logsData, changeLogsData] = await Promise.all([
                 getStaff(), 
                 getConfig(),
-                getPatients(),
+                getPatientsAction(), // Changed from getPatients() to getPatientsAction()
                 getAccessLogsAction(),
                 getPatientChangeLogsAction()
             ]);
@@ -108,6 +111,12 @@ export default function AdminDashboard() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (formData.password && formData.password.trim() !== '' && (!formData.email || formData.email.trim() === '')) {
+            alert('É obrigatório informar o e-mail quando uma senha é registrada (necessário para recuperação).');
+            return;
+        }
+
         try {
             const result = await saveStaffAction(editingId ? { ...formData, id: editingId } as MedicalStaff : formData);
             if (result.success) {
@@ -129,6 +138,8 @@ export default function AdminDashboard() {
                 
                 // Notify user
                 alert(editingId ? 'Profissional atualizado com sucesso!' : 'Profissional cadastrado com sucesso!');
+            } else {
+                alert(result.error || 'Erro ao salvar profissional.');
             }
         } catch (error) {
             console.error('Error saving staff:', error);
@@ -252,22 +263,20 @@ export default function AdminDashboard() {
         if (confirm(`Alterar nome do sistema de "${oldName}" para "${editValue}"? Isso atualizará todos os pacientes deste sistema.`)) {
             setIsUpdating(true);
             try {
-                console.log('Client: Calling updateSystemAction...');
                 const result = await updateSystemAction(oldName, editValue);
-                console.log('Client: updateSystemAction server result:', result);
                 setEditingSystem(null);
                 setEditValue("");
                 await fetchData();
                 alert("Sistema atualizado com sucesso!");
                 window.location.reload();
             } catch (error) {
-                console.error("Client: Error updating system:", error);
                 alert("Erro ao atualizar sistema. Verifique os logs.");
             } finally {
                 setIsUpdating(false);
             }
         }
     };
+
 
     const handleUpdateHospital = async (oldName: string) => {
         if (!editValue || editValue === oldName) {
@@ -286,6 +295,25 @@ export default function AdminDashboard() {
             } catch (error) {
                 console.error("Error updating hospital:", error);
                 alert("Erro ao atualizar local.");
+            } finally {
+                setIsUpdating(false);
+            }
+        }
+    };
+
+    const handleRecalculatePositions = async () => {
+        if (confirm("Isso irá recalcular a Posição de TODOS os pacientes com base na Data da AIH. Pacientes mais antigos terão as posições 1, 2, etc. Deseja continuar?")) {
+            setIsUpdating(true);
+            try {
+                const result = await recalculateAllPositionsAction();
+                if (result.success) {
+                    alert(`Posições recalculadas com sucesso! ${result?.updated || 0} pacientes afetados.`);
+                } else {
+                    alert("Erro ao recalcular posições.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao recalcular posições.");
             } finally {
                 setIsUpdating(false);
             }
@@ -381,391 +409,358 @@ export default function AdminDashboard() {
                         Pacientes
                     </button>
                     <button 
-                        onClick={() => setActiveTab('config')}
-                        title="Configurações Gerais de Equipes e Sistemas"
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'config' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                        onClick={() => setActiveTab('acessos')} 
+                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'acessos' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
                     >
-                        Configurações Gerais
+                        Auditoria
                     </button>
-                    <button onClick={() => setActiveTab('acessos')} className={`flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'acessos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                        <ShieldCheck size={16} /> Auditoria
+                    <button 
+                        onClick={() => setActiveTab('settings')} 
+                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        Configurações
                     </button>
-                    <button onClick={() => setActiveTab('fields')} className={`flex items-center gap-2 px-6 py-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'fields' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                        <Settings2 size={16} /> Campos
+                    <button
+                        onClick={() => setActiveTab('stats')}
+                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'stats' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        Estatísticas
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {activeTab === 'staff' ? (
+                <div className={activeTab === 'settings' ? "flex flex-col gap-8 max-w-4xl mx-auto w-full" : "grid grid-cols-1 lg:grid-cols-3 gap-8"}>
+                    {loading ? (
+                        <div className="lg:col-span-3 flex flex-col items-center justify-center py-20 animate-pulse">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                <Loader2 className="text-blue-600 animate-spin" size={24} />
+                            </div>
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Carregando painel...</p>
+                        </div>
+                    ) : (
                         <>
-                            <div className="lg:col-span-1">
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                    <div className="flex items-center gap-2 mb-6">
-                                        <UserPlus className="text-blue-600" size={20} />
-                                        <h2 className="text-lg font-bold text-slate-800">{editingId ? 'Editar Profissional' : 'Novo Cadastro'}</h2>
-                                    </div>
-                                    <div className="flex gap-2 mb-6">
-                                        <button 
-                                            onClick={() => setFormData(prev => ({ ...prev, type: 'preceptor' }))} 
-                                            title="Tipo: Preceptor"
-                                            className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'preceptor' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
-                                        >
-                                            <Stethoscope size={24} />
-                                            <span className="text-[10px] font-bold uppercase">Preceptor</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setFormData(prev => ({ ...prev, type: 'resident' }))} 
-                                            title="Tipo: Residente"
-                                            className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'resident' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
-                                        >
-                                            <UserCircle size={24} />
-                                            <span className="text-[10px] font-bold uppercase">Residente</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setFormData(prev => ({ ...prev, type: 'admin' }))} 
-                                            title="Tipo: Administrador"
-                                            className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'admin' ? 'border-slate-800 bg-slate-100 text-slate-900' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
-                                        >
-                                            <ShieldCheck size={24} />
-                                            <span className="text-[10px] font-bold uppercase">Admin</span>
-                                        </button>
-                                    </div>
-                                    <form onSubmit={handleSubmit} className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
-                                            <input 
-                                                title="Nome completo"
-                                                type="text" 
-                                                name="fullName" 
-                                                value={formData.fullName} 
-                                                onChange={handleChange} 
-                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
-                                                required 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail</label>
-                                            <input 
-                                                title="E-mail"
-                                                type="email" 
-                                                name="email" 
-                                                value={formData.email || ''} 
-                                                onChange={handleChange} 
-                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
-                                                placeholder="email@exemplo.com"
-                                                required={formData.type === 'admin'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome no Dashboard (Rótulo)</label>
-                                            <input 
-                                                title="Nome no sistema"
-                                                type="text" 
-                                                name="systemName" 
-                                                value={formData.systemName} 
-                                                onChange={handleChange} 
-                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900 font-semibold" 
-                                                placeholder="Ex: DR. SILVA"
-                                                required 
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CRM/RS (Opcional)</label>
-                                                <input 
-                                                    title="CRM"
-                                                    type="text" 
-                                                    name="crm" 
-                                                    value={formData.crm || ''} 
-                                                    onChange={handleChange} 
-                                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
-                                                />
+                            {activeTab === 'stats' ? (
+                                <div className="lg:col-span-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <DashboardStats patients={patients} />
+                                </div>
+                            ) : activeTab === 'staff' ? (
+                                <>
+                                    <div className="lg:col-span-1">
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                            <div className="flex items-center gap-2 mb-6">
+                                                <UserPlus className="text-blue-600" size={20} />
+                                                <h2 className="text-lg font-bold text-slate-800">{editingId ? 'Editar Profissional' : 'Novo Cadastro'}</h2>
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone (Opcional)</label>
-                                                <input 
-                                                    title="Telefone"
-                                                    type="tel" 
-                                                    name="phone" 
-                                                    value={formData.phone || ''} 
-                                                    onChange={handleChange} 
-                                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
-                                                />
+                                            <div className="flex gap-2 mb-6">
+                                                <button 
+                                                    onClick={() => setFormData(prev => ({ ...prev, type: 'preceptor' }))} 
+                                                    title="Tipo: Preceptor"
+                                                    className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'preceptor' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
+                                                >
+                                                    <Stethoscope size={24} />
+                                                    <span className="text-[10px] font-bold uppercase">Preceptor</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => setFormData(prev => ({ ...prev, type: 'resident' }))} 
+                                                    title="Tipo: Residente"
+                                                    className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'resident' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
+                                                >
+                                                    <UserCircle size={24} />
+                                                    <span className="text-[10px] font-bold uppercase">Residente</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => setFormData(prev => ({ ...prev, type: 'admin' }))} 
+                                                    title="Tipo: Administrador"
+                                                    className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.type === 'admin' ? 'border-slate-800 bg-slate-100 text-slate-900' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}
+                                                >
+                                                    <ShieldCheck size={24} />
+                                                    <span className="text-[10px] font-bold uppercase">Admin</span>
+                                                </button>
                                             </div>
-                                        </div>
-                                        <div className="pt-4 border-t border-slate-100">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Acesso ao Sistema (Opcional)</p>
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <form onSubmit={handleSubmit} className="space-y-4">
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Usuário</label>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
                                                     <input 
-                                                        title="Usuário"
+                                                        title="Nome completo"
                                                         type="text" 
-                                                        name="username" 
-                                                        value={formData.username || ''} 
+                                                        name="fullName" 
+                                                        value={formData.fullName} 
                                                         onChange={handleChange} 
                                                         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                        required 
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail</label>
                                                     <input 
-                                                        title="Senha"
-                                                        type="password" 
-                                                        name="password" 
-                                                        value={formData.password || ''} 
+                                                        title="E-mail"
+                                                        type="email" 
+                                                        name="email" 
+                                                        value={formData.email || ''} 
                                                         onChange={handleChange} 
                                                         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                        placeholder="email@exemplo.com"
+                                                        required={formData.type === 'admin' || (formData.password?.length || 0) > 0}
                                                     />
                                                 </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome no Dashboard (Rótulo)</label>
+                                                    <input 
+                                                        title="Nome no sistema"
+                                                        type="text" 
+                                                        name="systemName" 
+                                                        value={formData.systemName} 
+                                                        onChange={handleChange} 
+                                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900 font-semibold" 
+                                                        placeholder="Ex: DR. SILVA"
+                                                        required 
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CRM/RS (Opcional)</label>
+                                                        <input 
+                                                            title="CRM"
+                                                            type="text" 
+                                                            name="crm" 
+                                                            value={formData.crm || ''} 
+                                                            onChange={handleChange} 
+                                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone (Opcional)</label>
+                                                        <input 
+                                                            title="Telefone"
+                                                            type="tel" 
+                                                            name="phone" 
+                                                            value={formData.phone || ''} 
+                                                            onChange={handleChange} 
+                                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="pt-4 border-t border-slate-100">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Acesso ao Sistema (Opcional)</p>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Usuário</label>
+                                                            <input 
+                                                                title="Usuário"
+                                                                type="text" 
+                                                                name="username" 
+                                                                value={formData.username || ''} 
+                                                                onChange={handleChange} 
+                                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Senha</label>
+                                                            <input 
+                                                                title="Senha"
+                                                                type="password" 
+                                                                name="password" 
+                                                                value={formData.password || ''} 
+                                                                onChange={handleChange} 
+                                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-900" 
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    type="submit" 
+                                                    title="Salvar profissional"
+                                                    className={`w-full mt-4 flex items-center justify-center gap-2 text-[#0a1f44] py-3 rounded-xl font-bold shadow-md active:scale-95 ${editingId ? 'bg-[#c5a059]' : 'bg-[#d4af37]'}`}
+                                                >
+                                                    <Save size={18} />
+                                                    {editingId ? 'Atualizar Dados' : 'Salvar Profissional'}
+                                                </button>
+                                                {editingId && (
+                                                    <button 
+                                                        type="button" 
+                                                        title="Cancelar edição"
+                                                        onClick={() => { setEditingId(null); setFormData({ fullName: '', crm: '', systemName: '', phone: '', email: '', type: 'preceptor', username: '', password: '' }); }} 
+                                                        className="w-full mt-2 text-[10px] font-bold text-slate-400 uppercase"
+                                                    >
+                                                        Cancelar Edição
+                                                    </button>
+                                                )}
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div className="lg:col-span-2">
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="h-14 flex items-center justify-between px-4 lg:px-8 bg-slate-50/30">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="text-blue-600" size={20} />
+                                            <h2 className="text-lg font-bold text-slate-800">Equipe Médica</h2>
+                                        </div>
+                                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{staff.length} CADASTRADOS</span>
+                                    </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                                        <tr>
+                                                            <th 
+                                                                className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                                onClick={() => setStaffSort({ key: 'systemName', dir: staffSort.key === 'systemName' && staffSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                                            >
+                                                                <div className="flex items-center gap-1">
+                                                                    Profissional
+                                                                    {staffSort.key === 'systemName' && (staffSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                                                </div>
+                                                            </th>
+                                                            <th 
+                                                                className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                                onClick={() => setStaffSort({ key: 'crm', dir: staffSort.key === 'crm' && staffSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                                            >
+                                                                <div className="flex items-center gap-1">
+                                                                    CRM
+                                                                    {staffSort.key === 'crm' && (staffSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                                                </div>
+                                                            </th>
+                                                            <th className="px-6 py-4 text-center">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {loading ? <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr> : [...staff].sort((a, b) => {
+                                                            const valA = String(a[staffSort.key] || "").toLowerCase();
+                                                            const valB = String(b[staffSort.key] || "").toLowerCase();
+                                                            return staffSort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                                                        }).map((member) => (
+                                                            <tr 
+                                                                key={member.id} 
+                                                                className="hover:bg-slate-50 cursor-pointer"
+                                                                onClick={() => handleEdit(member)}
+                                                            >
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className={`p-2 rounded-lg ${
+                                                                            member.type === 'preceptor' ? 'bg-indigo-100 text-indigo-600' : 
+                                                                            member.type === 'resident' ? 'bg-emerald-100 text-emerald-600' :
+                                                                            'bg-slate-100 text-slate-600'
+                                                                        }`}>
+                                                                            {member.type === 'preceptor' ? <Stethoscope size={18} /> : 
+                                                                             member.type === 'resident' ? <Contact size={18} /> :
+                                                                             <ShieldCheck size={18} />}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-800">{member.systemName}</p>
+                                                                            <p className="text-[10px] text-slate-500 uppercase">{member.fullName}</p>
+                                                                            {member.email && <p className="text-[9px] text-blue-500 lowercase mt-0.5">{member.email}</p>}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 font-mono text-sm">{member.crm}</td>
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                        <button onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleEdit(member);
+                                                                        }} title="Editar" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><UserCircle size={18} /></button>
+                                                                        <button onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDelete(member.id, member.systemName);
+                                                                        }} title="Excluir" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
-                                        <button 
-                                            type="submit" 
-                                            title="Salvar profissional"
-                                            className={`w-full mt-4 flex items-center justify-center gap-2 text-[#0a1f44] py-3 rounded-xl font-bold shadow-md active:scale-95 ${editingId ? 'bg-[#c5a059]' : 'bg-[#d4af37]'}`}
-                                        >
-                                            <Save size={18} />
-                                            {editingId ? 'Atualizar Dados' : 'Salvar Profissional'}
-                                        </button>
-                                        {editingId && (
-                                            <button 
-                                                type="button" 
-                                                title="Cancelar edição"
-                                                onClick={() => { setEditingId(null); setFormData({ fullName: '', crm: '', systemName: '', phone: '', email: '', type: 'preceptor', username: '', password: '' }); }} 
-                                                className="w-full mt-2 text-[10px] font-bold text-slate-400 uppercase"
-                                            >
-                                                Cancelar Edição
-                                            </button>
-                                        )}
-                                    </form>
-                                </div>
-                            </div>
-                            <div className="lg:col-span-2">
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-6 border-b flex items-center justify-between"><div className="flex items-center gap-2"><Users className="text-blue-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Equipe Médica</h2></div><span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{staff.length} CADASTRADOS</span></div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
-                                                <tr>
-                                                    <th 
-                                                        className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                        onClick={() => setStaffSort({ key: 'systemName', dir: staffSort.key === 'systemName' && staffSort.dir === 'asc' ? 'desc' : 'asc' })}
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Profissional
-                                                            {staffSort.key === 'systemName' && (staffSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                                                        </div>
-                                                    </th>
-                                                    <th 
-                                                        className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                        onClick={() => setStaffSort({ key: 'crm', dir: staffSort.key === 'crm' && staffSort.dir === 'asc' ? 'desc' : 'asc' })}
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            CRM
-                                                            {staffSort.key === 'crm' && (staffSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                                                        </div>
-                                                    </th>
-                                                    <th className="px-6 py-4 text-center">Ações</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {loading ? <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr> : [...staff].sort((a, b) => {
-                                                    const valA = String(a[staffSort.key] || "").toLowerCase();
-                                                    const valB = String(b[staffSort.key] || "").toLowerCase();
-                                                    return staffSort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                                                }).map((member) => (
-                                                    <tr 
-                                                        key={member.id} 
-                                                        className="hover:bg-slate-50 cursor-pointer"
-                                                        onClick={() => handleEdit(member)}
-                                                    >
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`p-2 rounded-lg ${
-                                                                    member.type === 'preceptor' ? 'bg-indigo-100 text-indigo-600' : 
-                                                                    member.type === 'resident' ? 'bg-emerald-100 text-emerald-600' :
-                                                                    'bg-slate-100 text-slate-600'
-                                                                }`}>
-                                                                    {member.type === 'preceptor' ? <Stethoscope size={18} /> : 
-                                                                     member.type === 'resident' ? <Contact size={18} /> :
-                                                                     <ShieldCheck size={18} />}
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-slate-800">{member.systemName}</p>
-                                                                    <p className="text-[10px] text-slate-500 uppercase">{member.fullName}</p>
-                                                                    {member.email && <p className="text-[9px] text-blue-500 lowercase mt-0.5">{member.email}</p>}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 font-mono text-sm">{member.crm}</td>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                                <button onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleEdit(member);
-                                                                }} title="Editar" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><UserCircle size={18} /></button>
-                                                                <button onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDelete(member.id, member.systemName);
-                                                                }} title="Excluir" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
                                     </div>
-                                </div>
-                            </div>
-                        </>
-                    ) : activeTab === 'patients' ? (
-                        <div className="lg:col-span-3">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="p-6 border-b flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="text-blue-600" size={20} />
-                                        <h2 className="text-lg font-bold text-slate-800">Gerenciamento de Pacientes</h2>
-                                    </div>
-                                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{patients.length} PACIENTES</span>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
-                                            <tr>
-                                                <th 
-                                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                    onClick={() => setPatientSort({ key: 'name', dir: patientSort.key === 'name' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                </>
+                            ) : activeTab === 'patients' ? (
+                                <div className="lg:col-span-3">
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <div className="p-6 border-b flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="text-blue-600" size={20} />
+                                                <h2 className="text-lg font-bold text-slate-800">Gerenciamento de Pacientes</h2>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => exportPatientsToExcel(patients)}
+                                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
+                                                    title="Baixar lista completa em Excel"
                                                 >
-                                                    <div className="flex items-center gap-1">
-                                                        Nome do Paciente
-                                                        {patientSort.key === 'name' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                                                    </div>
-                                                </th>
-                                                <th 
-                                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                    onClick={() => setPatientSort({ key: 'medicalRecord', dir: patientSort.key === 'medicalRecord' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
-                                                >
-                                                    <div className="flex items-center gap-1">
-                                                        Prontuário
-                                                        {patientSort.key === 'medicalRecord' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                                                    </div>
-                                                </th>
-                                                <th 
-                                                    className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
-                                                    onClick={() => setPatientSort({ key: 'team', dir: patientSort.key === 'team' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
-                                                >
-                                                    <div className="flex items-center gap-1">
-                                                        Equipe
-                                                        {patientSort.key === 'team' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-                                                    </div>
-                                                </th>
-                                                <th className="px-6 py-4 text-center">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {loading ? (
-                                                <tr><td colSpan={4} className="p-12 text-center">Carregando...</td></tr>
-                                            ) : (
-                                                [...patients].sort((a, b) => {
-                                                    const valA = String(a[patientSort.key] || "").toLowerCase();
-                                                    const valB = String(b[patientSort.key] || "").toLowerCase();
-                                                    return patientSort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                                                }).map((p) => (
-                                                    <tr 
-                                                        key={p.id} 
-                                                        className="hover:bg-slate-50 transition-colors cursor-pointer"
-                                                        onClick={() => {
-                                                            setSelectedPatient(p);
-                                                            setIsPatientModalOpen(true);
-                                                        }}
-                                                    >
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-sm font-bold text-slate-800">{p.name}</span>
-                                                                <span className="text-[10px] text-slate-400 font-mono italic">{p.cpf}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 font-mono text-sm text-slate-600">{p.medicalRecord}</td>
-                                                        <td className="px-6 py-4 text-xs font-bold text-blue-600 uppercase">{p.team}</td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeletePatient(p.id, p.name);
-                                                                }} 
-                                                                title="Excluir Paciente" 
-                                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                            >
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    ) : activeTab === 'fields' ? (
-                        <div className="lg:col-span-3">
-                            <FieldManager />
-                        </div>
-                    ) : activeTab === 'acessos' ? (
-                        <div className="lg:col-span-3 space-y-4">
-                            <div className="flex gap-2 mb-2">
-                                <button 
-                                    onClick={() => setAuditSubTab('access')}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'access' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    Logins e Ações Gerais
-                                </button>
-                                <button 
-                                    onClick={() => setAuditSubTab('changes')}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'changes' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    Alterações de Pacientes (Detalhado)
-                                </button>
-                            </div>
-
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                {auditSubTab === 'access' ? (
-                                    <>
-                                        <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
-                                            Histórico de Acessos e Ações
-                                            <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{accessLogs.length} REGISTROS</span>
+                                                    <Layers size={16} />
+                                                    Exportar Excel
+                                                </button>
+                                                <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{patients.length} PACIENTES</span>
+                                            </div>
                                         </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left">
                                                 <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
                                                     <tr>
-                                                        <th className="px-6 py-4">Data e Hora</th>
-                                                        <th className="px-6 py-4">Usuário</th>
-                                                        <th className="px-6 py-4">Ação / Nível</th>
+                                                        <th 
+                                                            className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            onClick={() => setPatientSort({ key: 'name', dir: patientSort.key === 'name' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Nome do Paciente
+                                                                {patientSort.key === 'name' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                                            </div>
+                                                        </th>
+                                                        <th 
+                                                            className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            onClick={() => setPatientSort({ key: 'medicalRecord', dir: patientSort.key === 'medicalRecord' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Prontuário
+                                                                {patientSort.key === 'medicalRecord' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                                            </div>
+                                                        </th>
+                                                        <th 
+                                                            className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                                                            onClick={() => setPatientSort({ key: 'team', dir: patientSort.key === 'team' && patientSort.dir === 'asc' ? 'desc' : 'asc' })}
+                                                        >
+                                                            <div className="flex items-center gap-1">
+                                                                Equipe
+                                                                {patientSort.key === 'team' && (patientSort.dir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                                                            </div>
+                                                        </th>
+                                                        <th className="px-6 py-4 text-center">Ações</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {loading ? (
-                                                        <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr>
-                                                    ) : accessLogs.length === 0 ? (
-                                                        <tr><td colSpan={3} className="p-12 text-center text-slate-500">Nenhum registro encontrado.</td></tr>
+                                                        <tr><td colSpan={4} className="p-12 text-center">Carregando...</td></tr>
                                                     ) : (
-                                                        accessLogs.map((log, i) => (
-                                                            <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
-                                                                <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
+                                                        [...patients].sort((a, b) => {
+                                                            const valA = String(a[patientSort.key] || "").toLowerCase();
+                                                            const valB = String(b[patientSort.key] || "").toLowerCase();
+                                                            return patientSort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                                                        }).map((p) => (
+                                                            <tr 
+                                                                key={p.id} 
+                                                                className="hover:bg-slate-50 transition-colors cursor-pointer"
+                                                                onClick={() => {
+                                                                    setSelectedPatient(p);
+                                                                    setIsPatientModalOpen(true);
+                                                                }}
+                                                            >
                                                                 <td className="px-6 py-4">
-                                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                                        log.role.includes('CRIOU PACIENTE') ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
-                                                                        log.role.includes('EDITOU PACIENTE') ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                                                                        log.role.includes('EXCLUIU PACIENTE') ? 'bg-red-100 text-red-700 border border-red-200' :
-                                                                        log.role === 'ACEITE LGPD' ? 'bg-rose-100 text-rose-700' :
-                                                                        log.role === 'Administrador' ? 'bg-slate-800 text-white' :
-                                                                        'bg-indigo-100 text-indigo-700'
-                                                                    }`}>
-                                                                        {log.role}
-                                                                    </span>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-sm font-bold text-slate-800">{p.name}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-mono italic">{p.cpf}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 font-mono text-sm text-slate-600">{p.medicalRecord}</td>
+                                                                <td className="px-6 py-4 text-xs font-bold text-blue-600 uppercase">{p.team}</td>
+                                                                <td className="px-6 py-4 text-center">
+                                                                    <button 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeletePatient(p.id, p.name);
+                                                                        }} 
+                                                                        title="Excluir Paciente" 
+                                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                                    >
+                                                                        <Trash2 size={18} />
+                                                                    </button>
                                                                 </td>
                                                             </tr>
                                                         ))
@@ -773,260 +768,414 @@ export default function AdminDashboard() {
                                                 </tbody>
                                             </table>
                                         </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
-                                            Histórico Detalhado de Alterações
-                                            <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">{changeLogs.length} ALTERAÇÕES</span>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
-                                                    <tr>
-                                                        <th className="px-6 py-4">Data/Hora</th>
-                                                        <th className="px-6 py-4">Usuário</th>
-                                                        <th className="px-6 py-4">Paciente</th>
-                                                        <th className="px-6 py-4">Campo</th>
-                                                        <th className="px-6 py-4">De</th>
-                                                        <th className="px-6 py-4">Para</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {loading ? (
-                                                        <tr><td colSpan={6} className="p-12 text-center">Carregando...</td></tr>
-                                                    ) : changeLogs.length === 0 ? (
-                                                        <tr><td colSpan={6} className="p-12 text-center text-slate-500">Nenhuma alteração detalhada registrada.</td></tr>
-                                                    ) : (
-                                                        changeLogs.map((log, i) => (
-                                                            <tr key={i} className="hover:bg-slate-50 transition-colors text-xs">
-                                                                <td className="px-6 py-4 font-mono text-slate-500 whitespace-nowrap">{log.timestamp}</td>
-                                                                <td className="px-6 py-4 font-bold text-slate-700">{log.user}</td>
-                                                                <td className="px-6 py-4 text-blue-600 font-semibold">{log.patientName}</td>
-                                                                <td className="px-6 py-4 uppercase font-bold text-[10px] text-slate-500">{log.field}</td>
-                                                                <td className="px-6 py-4 text-rose-500 line-through max-w-[150px] truncate" title={log.oldValue}>{log.oldValue || '-'}</td>
-                                                                <td className="px-6 py-4 text-emerald-600 font-bold max-w-[150px] truncate" title={log.newValue}>{log.newValue || '-'}</td>
-                                                            </tr>
-                                                        ))
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="lg:col-span-1 space-y-8">
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                    <div className="flex items-center gap-2 mb-6"><Plus className="text-blue-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Nova Equipe</h2></div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            title="Nome da equipe"
-                                            type="text" 
-                                            placeholder="Nome da Equipe" 
-                                            value={newTeam} 
-                                            onChange={(e) => setNewTeam(e.target.value.toUpperCase())} 
-                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 text-black rounded-lg outline-none" 
-                                        />
-                                        <button onClick={handleAddTeam} title="Adicionar Equipe" className="bg-[#d4af37] text-[#0a1f44] p-2.5 rounded-lg"><Plus size={20} /></button>
                                     </div>
                                 </div>
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                    <div className="flex items-center gap-2 mb-6"><Layers className="text-indigo-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Novo Local (Hospital)</h2></div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            title="Nome do local"
-                                            type="text" 
-                                            placeholder="Local da Cirurgia" 
-                                            value={newHospital} 
-                                            onChange={(e) => setNewHospital(e.target.value.toUpperCase())} 
-                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 text-black rounded-lg outline-none" 
-                                        />
-                                        <button onClick={handleAddHospital} title="Adicionar Local" className="bg-emerald-600 text-white p-2.5 rounded-lg"><Plus size={20} /></button>
-                                    </div>
-                                </div>
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                    <div className="flex items-center gap-2 mb-6"><Layers className="text-indigo-600" size={20} /><h2 className="text-lg font-bold text-slate-800">Novo Sistema</h2></div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            title="Nome do sistema"
-                                            type="text" 
-                                            placeholder="Nome do Sistema" 
-                                            value={newSystem} 
-                                            onChange={(e) => setNewSystem(e.target.value.toUpperCase())} 
-                                            className="flex-1 p-2.5 bg-slate-50 border border-slate-200 text-black rounded-lg outline-none" 
-                                        />
-                                        <button onClick={handleAddSystem} title="Adicionar Sistema" className="bg-indigo-600 text-white p-2.5 rounded-lg"><Plus size={20} /></button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="lg:col-span-2 grid grid-cols-1 xl:grid-cols-2 gap-8">
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
-                                        Equipes Ativas
+                            ) : activeTab === 'acessos' ? (
+                                <div className="lg:col-span-3 space-y-4">
+                                    <div className="flex gap-2 mb-2">
                                         <button 
-                                            onClick={() => setTeamSortDir(teamSortDir === 'asc' ? 'desc' : 'asc')}
-                                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-                                            title="Ordenar Equipes"
+                                            onClick={() => setAuditSubTab('access')}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'access' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
                                         >
-                                            {teamSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                                            Logins e Ações Gerais
+                                        </button>
+                                        <button 
+                                            onClick={() => setAuditSubTab('changes')}
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${auditSubTab === 'changes' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            Alterações de Pacientes (Detalhado)
                                         </button>
                                     </div>
-                                    <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-                                        {[...config.teams].sort((a, b) => teamSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(team => (
-                                            <div key={team} className="p-4 flex justify-between items-center hover:bg-slate-50 group">
-                                                {editingTeam === team ? (
-                                                    <div className="flex gap-2 w-full">
-                                                        <input 
-                                                            autoFocus
-                                                            type="text" 
-                                                            value={editValue} 
-                                                            onChange={(e) => setEditValue(e.target.value.toUpperCase())}
-                                                            title="Editar nome da equipe"
-                                                            placeholder="DIGITE O NOVO NOME"
-                                                            className="flex-1 p-1.5 bg-white border border-blue-400 text-slate-800 rounded outline-none text-sm font-bold"
-                                                            disabled={isUpdating}
-                                                        />
-                                                        <button 
-                                                            onClick={() => handleUpdateTeam(team)} 
-                                                            disabled={isUpdating}
-                                                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase disabled:opacity-50"
-                                                        >
-                                                            {isUpdating ? "Salvando..." : "Salvar"}
-                                                        </button>
-                                                        <button onClick={() => setEditingTeam(null)} className="text-slate-400 hover:text-slate-500 font-bold text-xs uppercase">X</button>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <span className="text-sm font-bold text-slate-700">{team}</span>
-                                                        <div className="flex items-center gap-1">
-                                                            <button 
-                                                                onClick={() => { setEditingTeam(team); setEditValue(team); }} 
-                                                                className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded transition-all opacity-0 group-hover:opacity-100"
-                                                                title="Editar nome"
-                                                            >
-                                                                <Save size={14} className="opacity-70" />
-                                                            </button>
-                                                            <button onClick={() => handleDeleteTeam(team)} title="Excluir equipe" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-6 border-b font-bold text-slate-800 bg-indigo-50 flex items-center justify-between">
-                                        Sistemas Ativos
-                                        <button 
-                                            onClick={() => setSystemSortDir(systemSortDir === 'asc' ? 'desc' : 'asc')}
-                                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-                                            title="Ordenar Sistemas"
-                                        >
-                                            {systemSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                                        </button>
-                                    </div>
-                                    <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-                                        {[...config.systems].sort((a, b) => systemSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(system => (
-                                            <div key={system} className="p-4 flex justify-between items-center hover:bg-slate-50 group">
-                                                {editingSystem === system ? (
-                                                    <div className="flex gap-2 w-full">
-                                                        <input 
-                                                            autoFocus
-                                                            type="text" 
-                                                            value={editValue} 
-                                                            onChange={(e) => setEditValue(e.target.value.toUpperCase())}
-                                                            title="Editar nome do sistema"
-                                                            placeholder="DIGITE O NOVO NOME"
-                                                            className="flex-1 p-1.5 bg-white border border-blue-400 text-slate-800 rounded outline-none text-sm font-bold"
-                                                            disabled={isUpdating}
-                                                        />
-                                                        <button 
-                                                            onClick={() => handleUpdateSystem(system)} 
-                                                            disabled={isUpdating}
-                                                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase disabled:opacity-50"
-                                                        >
-                                                            {isUpdating ? "Salvando..." : "Salvar"}
-                                                        </button>
-                                                        <button onClick={() => setEditingSystem(null)} className="text-slate-400 hover:text-slate-500 font-bold text-xs uppercase">X</button>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <span className="text-sm font-bold text-slate-700">{system}</span>
-                                                        <div className="flex items-center gap-1">
-                                                            <button 
-                                                                onClick={() => { setEditingSystem(system); setEditValue(system); }} 
-                                                                className="p-1.5 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded transition-all opacity-0 group-hover:opacity-100"
-                                                                title="Editar nome"
-                                                            >
-                                                                <Save size={14} className="opacity-70" />
-                                                            </button>
-                                                            <button onClick={() => handleDeleteSystem(system)} title="Excluir sistema" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
 
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-6 border-b font-bold text-slate-800 bg-emerald-50 flex items-center justify-between">
-                                        Locais de Cirurgia
-                                        <button 
-                                            onClick={() => setHospitalSortDir(hospitalSortDir === 'asc' ? 'desc' : 'asc')}
-                                            className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-                                            title="Ordenar Locais"
-                                        >
-                                            {hospitalSortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                                        </button>
-                                    </div>
-                                    <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
-                                        {config.hospitals && [...config.hospitals].sort((a, b) => hospitalSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(hospital => (
-                                            <div key={hospital} className="p-4 flex justify-between items-center hover:bg-slate-50 group">
-                                                {editingHospital === hospital ? (
-                                                    <div className="flex gap-2 w-full">
-                                                        <input 
-                                                            autoFocus
-                                                            type="text" 
-                                                            value={editValue} 
-                                                            onChange={(e) => setEditValue(e.target.value.toUpperCase())}
-                                                            title="Editar nome do Local"
-                                                            placeholder="DIGITE O NOVO LOCAL"
-                                                            className="flex-1 p-1.5 bg-white border border-emerald-400 text-slate-800 rounded outline-none text-sm font-bold"
-                                                            disabled={isUpdating}
-                                                        />
-                                                        <button 
-                                                            onClick={() => handleUpdateHospital(hospital)} 
-                                                            disabled={isUpdating}
-                                                            className="text-emerald-600 hover:text-emerald-700 font-bold text-xs uppercase disabled:opacity-50"
-                                                        >
-                                                            {isUpdating ? "Salvando..." : "Salvar"}
-                                                        </button>
-                                                        <button onClick={() => setEditingHospital(null)} className="text-slate-400 hover:text-slate-500 font-bold text-xs uppercase">X</button>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <span className="text-sm font-bold text-slate-700">{hospital}</span>
-                                                        <div className="flex items-center gap-1">
-                                                            <button 
-                                                                onClick={() => { setEditingHospital(hospital); setEditValue(hospital); }} 
-                                                                className="p-1.5 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 rounded transition-all opacity-0 group-hover:opacity-100"
-                                                                title="Editar local"
-                                                            >
-                                                                <Save size={14} className="opacity-70" />
-                                                            </button>
-                                                            <button onClick={() => handleDeleteHospital(hospital)} title="Excluir local" className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ))}
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                        {auditSubTab === 'access' ? (
+                                            <>
+                                                <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
+                                                    Histórico de Acessos e Ações
+                                                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">{accessLogs.length} REGISTROS</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left">
+                                                        <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                                            <tr>
+                                                                <th className="px-6 py-4">Data e Hora</th>
+                                                                <th className="px-6 py-4">Usuário</th>
+                                                                <th className="px-6 py-4">Ação / Nível</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {loading ? (
+                                                                <tr><td colSpan={3} className="p-12 text-center">Carregando...</td></tr>
+                                                            ) : accessLogs.length === 0 ? (
+                                                                <tr><td colSpan={3} className="p-12 text-center text-slate-500">Nenhum registro encontrado.</td></tr>
+                                                            ) : (
+                                                                accessLogs.map((log, i) => (
+                                                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                                                        <td className="px-6 py-4 text-xs font-mono text-slate-600">{log.timestamp}</td>
+                                                                        <td className="px-6 py-4 text-sm font-bold text-slate-800">{log.username}</td>
+                                                                        <td className="px-6 py-4">
+                                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                                                log.role.includes('CRIOU PACIENTE') ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                                                                                log.role.includes('EDITOU PACIENTE') ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                                                                                log.role.includes('EXCLUIU PACIENTE') ? 'bg-red-100 text-red-700 border border-red-200' :
+                                                                                log.role === 'ACEITE LGPD' ? 'bg-rose-100 text-rose-700' :
+                                                                                log.role === 'Administrador' ? 'bg-slate-800 text-white' :
+                                                                                'bg-indigo-100 text-indigo-700'
+                                                                            }`}>
+                                                                                {log.role}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="p-6 border-b font-bold text-slate-800 bg-slate-50 flex items-center justify-between">
+                                                    Histórico Detalhado de Alterações
+                                                    <span className="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">{changeLogs.length} ALTERAÇÕES</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left">
+                                                        <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b">
+                                                            <tr>
+                                                                <th className="px-6 py-4">Data/Hora</th>
+                                                                <th className="px-6 py-4">Usuário</th>
+                                                                <th className="px-6 py-4">Paciente</th>
+                                                                <th className="px-6 py-4">Campo</th>
+                                                                <th className="px-6 py-4">De</th>
+                                                                <th className="px-6 py-4">Para</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {loading ? (
+                                                                <tr><td colSpan={6} className="p-12 text-center">Carregando...</td></tr>
+                                                            ) : changeLogs.length === 0 ? (
+                                                                <tr><td colSpan={6} className="p-12 text-center text-slate-500">Nenhuma alteração detalhada registrada.</td></tr>
+                                                            ) : (
+                                                                changeLogs.map((log, i) => (
+                                                                    <tr key={i} className="hover:bg-slate-50 transition-colors text-xs">
+                                                                        <td className="px-6 py-4 font-mono text-slate-500 whitespace-nowrap">{log.timestamp}</td>
+                                                                        <td className="px-6 py-4 font-bold text-slate-700">{log.user}</td>
+                                                                        <td className="px-6 py-4 text-blue-600 font-semibold">{log.patientName}</td>
+                                                                        <td className="px-6 py-4 uppercase font-bold text-[10px] text-slate-500">{log.field}</td>
+                                                                        <td className="px-6 py-4 text-rose-500 line-through max-w-[150px] truncate" title={log.oldValue}>{log.oldValue || '-'}</td>
+                                                                        <td className="px-6 py-4 text-emerald-600 font-bold max-w-[150px] truncate" title={log.newValue}>{log.newValue || '-'}</td>
+                                                                    </tr>
+                                                                ))
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            ) : activeTab === 'settings' ? (
+                                <div className="flex flex-col gap-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* Header da Aba */}
+                                    <div className="flex flex-col gap-2">
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Configurações do Sistema</h2>
+                                        <p className="text-sm text-slate-500 font-medium">Gerencie a infraestrutura, membros da equipe e campos personalizados.</p>
+                                    </div>
+
+                                    <div className="flex flex-col gap-6">
+                                        {/* Card: Status da Conexão */}
+                                        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between group hover:shadow-md transition-all gap-4">
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                                                    <Cloud size={32} />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Google Sheets API</h3>
+                                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full">
+                                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Online</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 font-medium leading-relaxed">Sincronização em tempo real ativa. Todos os dados estão protegidos na nuvem.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Card: Segurança & Backup */}
+                                        <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-125 transition-transform duration-700 rotate-12">
+                                                <Lock size={120} className="text-white" />
+                                            </div>
+                                            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-10 h-10 bg-blue-500/20 text-blue-400 rounded-xl flex items-center justify-center">
+                                                            <ShieldCheck size={22} />
+                                                        </div>
+                                                        <h3 className="text-xl font-black text-white tracking-tight">Cloud Backup (Snapshot)</h3>
+                                                    </div>
+                                                    <p className="text-sm text-slate-400 font-medium max-w-md">Gere um arquivo JSON com 100% dos dados para segurança redundante ou migrações.</p>
+                                                    
+                                                    <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2 bg-white/5 p-3 rounded-2xl border border-white/5 inline-flex w-fit">
+                                                        <span className="flex items-center gap-1.5"><Database size={12} /> {patients.length} Pacientes</span>
+                                                        <span className="w-1 h-1 bg-slate-700 rounded-full" />
+                                                        <span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500" /> Criptografia SSL</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={() => downloadBackupAsJson(patients)}
+                                                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3 group/btn whitespace-nowrap"
+                                                >
+                                                    <Save size={20} className="group-hover/btn:rotate-12 transition-transform" />
+                                                    Gerar Backup Agora
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Configurações em Fluxo Vertical (Coluna Única) */}
+                                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
+                                                <Plus size={20} />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-slate-800">Cadastrar Nova Equipe</h2>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <input 
+                                                title="Nome da equipe"
+                                                type="text" 
+                                                placeholder="DIGITE O NOME DA EQUIPE" 
+                                                value={newTeam} 
+                                                onChange={(e) => setNewTeam(e.target.value.toUpperCase())} 
+                                                className="flex-1 p-4 bg-slate-50 border border-slate-200 text-black rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold tracking-wide" 
+                                            />
+                                            <button 
+                                                onClick={handleAddTeam} 
+                                                title="Adicionar Equipe" 
+                                                className="bg-[#d4af37] text-[#0a1f44] px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-[#d4af37]/20 active:scale-95 transition-all"
+                                            >
+                                                Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                                        <div className="p-6 border-b font-black text-slate-800 bg-slate-50/50 flex items-center justify-between uppercase tracking-[0.1em] text-xs">
+                                            <span>Equipes Ativas</span>
+                                            <button 
+                                                onClick={() => setTeamSortDir(teamSortDir === 'asc' ? 'desc' : 'asc')}
+                                                className="p-2 hover:bg-slate-200 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm"
+                                                title="Ordenar Equipes"
+                                            >
+                                                {teamSortDir === 'asc' ? <ArrowUp size={14} className="text-blue-600" /> : <ArrowDown size={14} className="text-blue-600" />}
+                                            </button>
+                                        </div>
+                                        <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {[...config.teams].sort((a, b) => teamSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(team => (
+                                                <div key={team} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+                                                    {editingTeam === team ? (
+                                                        <div className="flex gap-3 w-full">
+                                                            <input 
+                                                                autoFocus
+                                                                type="text" 
+                                                                value={editValue} 
+                                                                onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+                                                                title="Editar nome da equipe"
+                                                                className="flex-1 p-2 bg-white border-2 border-blue-400 text-slate-800 rounded-xl outline-none text-sm font-bold"
+                                                                disabled={isUpdating}
+                                                            />
+                                                            <button onClick={() => handleUpdateTeam(team)} disabled={isUpdating} className="px-4 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase">Salvar</button>
+                                                            <button onClick={() => setEditingTeam(null)} className="p-2 text-slate-400">X</button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{team}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button onClick={() => { setEditingTeam(team); setEditValue(team); }} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Save size={16} /></button>
+                                                                <button onClick={() => handleDeleteTeam(team)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                                                <Layers size={20} />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-slate-800">Cadastrar Novo Local (Hospital)</h2>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <input 
+                                                title="Nome do local"
+                                                type="text" 
+                                                placeholder="DIGITE O NOME DO HOSPITAL" 
+                                                value={newHospital} 
+                                                onChange={(e) => setNewHospital(e.target.value.toUpperCase())} 
+                                                className="flex-1 p-4 bg-slate-50 border border-slate-200 text-black rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-bold tracking-wide" 
+                                            />
+                                            <button 
+                                                onClick={handleAddHospital} 
+                                                title="Adicionar Local" 
+                                                className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                                            >
+                                                Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                                        <div className="p-6 border-b font-black text-slate-800 bg-slate-50/50 flex items-center justify-between uppercase tracking-[0.1em] text-xs">
+                                            <span>Locais de Cirurgia Ativos</span>
+                                            <button 
+                                                onClick={() => setHospitalSortDir(hospitalSortDir === 'asc' ? 'desc' : 'asc')}
+                                                className="p-2 hover:bg-slate-200 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm"
+                                                title="Ordenar Locais"
+                                            >
+                                                {hospitalSortDir === 'asc' ? <ArrowUp size={14} className="text-emerald-600" /> : <ArrowDown size={14} className="text-emerald-600" />}
+                                            </button>
+                                        </div>
+                                        <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {config.hospitals && [...config.hospitals].sort((a, b) => hospitalSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(hospital => (
+                                                <div key={hospital} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+                                                    {editingHospital === hospital ? (
+                                                        <div className="flex gap-3 w-full">
+                                                            <input 
+                                                                autoFocus
+                                                                type="text" 
+                                                                value={editValue} 
+                                                                onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+                                                                title="Editar nome do local"
+                                                                className="flex-1 p-2 bg-white border-2 border-blue-400 text-slate-800 rounded-xl outline-none text-sm font-bold"
+                                                                disabled={isUpdating}
+                                                            />
+                                                            <button onClick={() => handleUpdateHospital(hospital)} disabled={isUpdating} className="px-4 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase">Salvar</button>
+                                                            <button onClick={() => setEditingHospital(null)} className="p-2 text-slate-400">X</button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{hospital}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button onClick={() => { setEditingHospital(hospital); setEditValue(hospital); }} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><Save size={16} /></button>
+                                                                <button onClick={() => handleDeleteHospital(hospital)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                                                <Layers size={20} />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-slate-800">Cadastrar Novo Sistema</h2>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <input 
+                                                title="Nome do sistema"
+                                                type="text" 
+                                                placeholder="DIGITE O NOME DO SISTEMA" 
+                                                value={newSystem} 
+                                                onChange={(e) => setNewSystem(e.target.value.toUpperCase())} 
+                                                className="flex-1 p-4 bg-slate-50 border border-slate-200 text-black rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold tracking-wide" 
+                                            />
+                                            <button 
+                                                onClick={handleAddSystem} 
+                                                title="Adicionar Sistema" 
+                                                className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+                                            >
+                                                Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                                        <div className="p-6 border-b font-black text-slate-800 bg-slate-50/50 flex items-center justify-between uppercase tracking-[0.1em] text-xs">
+                                            <span>Sistemas Ativos</span>
+                                            <button 
+                                                onClick={() => setSystemSortDir(systemSortDir === 'asc' ? 'desc' : 'asc')}
+                                                className="p-2 hover:bg-slate-200 rounded-xl transition-colors bg-white border border-slate-200 shadow-sm"
+                                                title="Ordenar Sistemas"
+                                            >
+                                                {systemSortDir === 'asc' ? <ArrowUp size={14} className="text-indigo-600" /> : <ArrowDown size={14} className="text-indigo-600" />}
+                                            </button>
+                                        </div>
+                                        <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {[...config.systems].sort((a, b) => systemSortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a)).map(system => (
+                                                <div key={system} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+                                                    {editingSystem === system ? (
+                                                        <div className="flex gap-3 w-full">
+                                                            <input 
+                                                                autoFocus
+                                                                type="text" 
+                                                                value={editValue} 
+                                                                onChange={(e) => setEditValue(e.target.value.toUpperCase())}
+                                                                title="Editar nome do sistema"
+                                                                className="flex-1 p-2 bg-white border-2 border-blue-400 text-slate-800 rounded-xl outline-none text-sm font-bold"
+                                                                disabled={isUpdating}
+                                                            />
+                                                            <button onClick={() => handleUpdateSystem(system)} disabled={isUpdating} className="px-4 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase">Salvar</button>
+                                                            <button onClick={() => setEditingSystem(null)} className="p-2 text-slate-400">X</button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{system}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button onClick={() => { setEditingSystem(system); setEditValue(system); }} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Save size={16} /></button>
+                                                                <button onClick={() => handleDeleteSystem(system)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Ferramentas do Sistema */}
+                                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <div className="p-2 bg-orange-50 rounded-xl text-orange-600">
+                                                <TrendingUp size={20} />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-slate-800">Ferramentas do Sistema</h2>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-4">
+                                            <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                <div>
+                                                    <h3 className="font-bold text-slate-800 text-sm">Recalcular Posições (AIH)</h3>
+                                                    <p className="text-xs text-slate-500 mt-1">Reordena o campo "Posição" de todos os pacientes ativos baseado na ordem cronológica da Data da AIH.</p>
+                                                </div>
+                                                <button
+                                                    onClick={handleRecalculatePositions}
+                                                    disabled={isUpdating}
+                                                    className="shrink-0 bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-orange-600/20 transition-all disabled:opacity-50"
+                                                >
+                                                    {isUpdating ? 'Processando...' : 'Recalcular Posições'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* FieldManager no final do fluxo */}
+                                    <div className="pt-8">
+                                        <FieldManager />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="lg:col-span-3 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">
+                                    Selecione uma aba válida.
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

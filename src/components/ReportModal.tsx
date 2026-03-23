@@ -85,14 +85,15 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
             if (startDate || endDate) {
                 if (!p.surgeryDate || p.surgeryDate === '--') return false;
                 
+                const sDate = String(p.surgeryDate || '');
                 let d: Date | null = null;
-                if (p.surgeryDate.includes('/')) {
-                    const parts = p.surgeryDate.split('/');
+                if (sDate.includes('/')) {
+                    const parts = sDate.split('/');
                     if (parts.length === 3) {
                         d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00`);
                     }
-                } else if (p.surgeryDate.includes('-')) {
-                    d = new Date(`${p.surgeryDate}T12:00:00`);
+                } else if (sDate.includes('-')) {
+                    d = new Date(`${sDate}T12:00:00`);
                 }
                 
                 if (d && !isNaN(d.getTime())) {
@@ -108,14 +109,14 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                     return false;
                 }
             }
-            if (filters.preceptor.length > 0 && (!p.preceptor || !filters.preceptor.includes(p.preceptor))) return false;
-            if (filters.resident.length > 0 && (!p.resident || !filters.resident.includes(p.resident))) return false;
-            if (filters.auxiliaryResidents.length > 0 && (!p.auxiliaryResidents || !p.auxiliaryResidents.some(r => filters.auxiliaryResidents.includes(r)))) return false;
-            if (filters.status.length > 0 && (!p.status || !filters.status.includes(p.status))) return false;
-            if (filters.sistema.length > 0 && (!p.sistema || !filters.sistema.includes(p.sistema))) return false;
-            if (filters.team.length > 0 && (!p.team || !filters.team.includes(p.team))) return false;
-            if (filters.priority.length > 0 && (!p.priority || !filters.priority.includes(p.priority))) return false;
-            if (filters.hospital.length > 0 && (!p.hospital || !filters.hospital.includes(p.hospital))) return false;
+            if (filters.preceptor.length > 0 && (!p.preceptor || !filters.preceptor.includes(String(p.preceptor)))) return false;
+            if (filters.resident.length > 0 && (!p.resident || !filters.resident.includes(String(p.resident)))) return false;
+            if (filters.auxiliaryResidents.length > 0 && (!p.auxiliaryResidents || !(p.auxiliaryResidents as string[]).some(r => filters.auxiliaryResidents.includes(r)))) return false;
+            if (filters.status.length > 0 && (!p.status || !filters.status.includes(String(p.status)))) return false;
+            if (filters.sistema.length > 0 && (!p.sistema || !filters.sistema.includes(String(p.sistema)))) return false;
+            if (filters.team.length > 0 && (!p.team || !filters.team.includes(String(p.team)))) return false;
+            if (filters.priority.length > 0 && (!p.priority || !filters.priority.includes(String(p.priority)))) return false;
+            if (filters.hospital.length > 0 && (!p.hospital || !filters.hospital.includes(String(p.hospital)))) return false;
             return true;
         });
 

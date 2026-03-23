@@ -1,16 +1,21 @@
 {
-  "name": "HSR CRM Cirúrgico",
+  "name": "HSR CRM CIRÚRGICO",
   "short_name": "HSR CRM",
-  "description": "CRM para acompanhamento de casos cirúrgicos HSR",
+  "description": "Sistema de Gestão de Pacientes Cirúrgicos - Hospital Santa Rita",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a1f44",
   "theme_color": "#0a1f44",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M13 2v6h6V2h-6zm0 8v6h6v-6h-6zm-8-8v6h6V2H5zm0 8v6h6v-6H5zm0 8v6h14v-6H5z'/%3E%3C/svg%3E",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
