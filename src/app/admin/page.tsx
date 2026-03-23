@@ -25,7 +25,8 @@ export default function AdminDashboard() {
     const [newTeam, setNewTeam] = useState("");
     const [newSystem, setNewSystem] = useState("");
     const [newHospital, setNewHospital] = useState("");
-    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos' | 'fields' | 'stats' | 'settings'>('staff');
+    const [activeTab, setActiveTab] = useState<'staff' | 'config' | 'patients' | 'acessos' | 'fields' | 'stats' | 'settings'>('stats');
+    const [userRole, setUserRole] = useState<string>('');
     const [patients, setPatients] = useState<Patient[]>([]);
     const [accessLogs, setAccessLogs] = useState<{ timestamp: string, username: string, role: string }[]>([]);
     const [changeLogs, setChangeLogs] = useState<{ timestamp: string, user: string, patientId: string, patientName: string, field: string, oldValue: string, newValue: string }[]>([]);
@@ -80,13 +81,21 @@ export default function AdminDashboard() {
     useEffect(() => {
         const checkAuth = async () => {
             const isAuth = document.cookie.includes('auth=true');
-            const isAdmin = document.cookie.includes('role=Administrador');
+            const decodedCookie = decodeURIComponent(document.cookie);
+            const isAdmin = decodedCookie.includes('role=Administrador');
+            const isPreceptor = decodedCookie.includes('role=Médico Preceptor');
             
             if (!isAuth) {
                 router.push('/login');
-            } else if (!isAdmin) {
+            } else if (!isAdmin && !isPreceptor) {
                 router.push('/');
             } else {
+                setUserRole(isAdmin ? 'Administrador' : 'Médico Preceptor');
+                if (!isAdmin) {
+                    setActiveTab('stats');
+                } else {
+                    setActiveTab('staff');
+                }
                 await fetchData();
             }
         };
@@ -346,80 +355,86 @@ export default function AdminDashboard() {
                             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Painel Administrativo</h1>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, type: 'preceptor' }));
-                                setActiveTab('staff');
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            <Stethoscope size={18} />
-                            Novo Preceptor
-                        </button>
-                        <button 
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, type: 'resident' }));
-                                setActiveTab('staff');
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            <UserCircle size={18} />
-                            Novo Residente
-                        </button>
-                        <button 
-                            onClick={() => {
-                                setFormData(prev => ({ ...prev, type: 'admin' }));
-                                setActiveTab('staff');
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            <ShieldCheck size={18} />
-                            Novo Admin
-                        </button>
-                        <button 
-                            onClick={() => setIsPatientModalOpen(true)}
-                            className="flex items-center gap-2 bg-[#d4af37] hover:bg-[#c5a059] text-[#0a1f44] px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            <Plus size={18} />
-                            Novo Paciente
-                        </button>
-                    </div>
+                    {userRole === 'Administrador' && (
+                        <div className="flex flex-wrap items-center gap-3 mt-4 sm:mt-0">
+                            <button 
+                                onClick={() => {
+                                    setFormData(prev => ({ ...prev, type: 'preceptor' }));
+                                    setActiveTab('staff');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
+                            >
+                                <Stethoscope size={18} />
+                                <span className="hidden sm:inline">Novo Preceptor</span>
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setFormData(prev => ({ ...prev, type: 'resident' }));
+                                    setActiveTab('staff');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
+                            >
+                                <UserCircle size={18} />
+                                <span className="hidden sm:inline">Novo Residente</span>
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setFormData(prev => ({ ...prev, type: 'admin' }));
+                                    setActiveTab('staff');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
+                            >
+                                <ShieldCheck size={18} />
+                                <span className="hidden sm:inline">Novo Admin</span>
+                            </button>
+                            <button 
+                                onClick={() => setIsPatientModalOpen(true)}
+                                className="flex items-center gap-2 bg-[#d4af37] hover:bg-[#c5a059] text-[#0a1f44] px-4 py-2 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
+                            >
+                                <Plus size={18} />
+                                <span className="hidden sm:inline">Novo Paciente</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </header>
 
             <main className="flex-1 max-w-7xl w-full mx-auto p-8">
                 {/* Tabs */}
-                <div className="flex gap-4 mb-8">
-                    <button 
-                        onClick={() => setActiveTab('staff')}
-                        title="Gerenciar Equipe Médica"
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'staff' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-                    >
-                        Equipe Médica
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('patients')}
-                        title="Gerenciar Todos os Pacientes"
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'patients' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-                    >
-                        Pacientes
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('acessos')} 
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'acessos' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-                    >
-                        Auditoria
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('settings')} 
-                        className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
-                    >
-                        Configurações
-                    </button>
+                <div className="flex flex-wrap gap-4 mb-8">
+                    {userRole === 'Administrador' && (
+                        <>
+                            <button 
+                                onClick={() => setActiveTab('staff')}
+                                title="Gerenciar Equipe Médica"
+                                className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'staff' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                            >
+                                Equipe Médica
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('patients')}
+                                title="Gerenciar Todos os Pacientes"
+                                className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'patients' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                            >
+                                Pacientes
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('acessos')} 
+                                className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'acessos' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                            >
+                                Auditoria
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('settings')} 
+                                className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                            >
+                                Configurações
+                            </button>
+                        </>
+                    )}
                     <button
                         onClick={() => setActiveTab('stats')}
                         className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'stats' ? 'bg-[#d4af37] text-[#0a1f44] shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}

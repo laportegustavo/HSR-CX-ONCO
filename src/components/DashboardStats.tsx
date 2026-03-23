@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -13,10 +13,31 @@ interface DashboardStatsProps {
 }
 
 export default function DashboardStats({ patients }: DashboardStatsProps) {
+    const [selectedTeam, setSelectedTeam] = useState<string>("Todas");
+    const [selectedSystem, setSelectedSystem] = useState<string>("Todos");
+
+    const teams = useMemo(() => {
+        const t = new Set<string>();
+        patients.forEach(p => { if (p.team && p.team !== '--') t.add(String(p.team)); });
+        return ["Todas", ...Array.from(t).sort()];
+    }, [patients]);
+
+    const systems = useMemo(() => {
+        const s = new Set<string>();
+        patients.forEach(p => { if (p.sistema && p.sistema !== '--') s.add(String(p.sistema)); });
+        return ["Todos", ...Array.from(s).sort()];
+    }, [patients]);
+
     const statsData = useMemo(() => {
+        const filtered = patients.filter(p => {
+            if (selectedTeam !== "Todas" && p.team !== selectedTeam) return false;
+            if (selectedSystem !== "Todos" && p.sistema !== selectedSystem) return false;
+            return true;
+        });
+
         // 1. Status Distribution
         const statusMap: Record<string, number> = {};
-        patients.forEach(p => {
+        filtered.forEach(p => {
             const status = String(p.status || 'SEM STATUS');
             statusMap[status] = (statusMap[status] || 0) + 1;
         });
@@ -35,26 +56,35 @@ export default function DashboardStats({ patients }: DashboardStatsProps) {
         // 3. Wait Time Analysis (AIH to Surgery)
         const parseDate = (d: string): DateTime | null => {
             if (!d || d === '--') return null;
-            if (d.includes('/')) {
-                const parts = d.split('/');
-                if (parts.length === 3) {
-                    return DateTime.fromObject({ year: Number(parts[2]), month: Number(parts[1]), day: Number(parts[0]) }, { zone: 'America/Sao_Paulo' }).startOf('day');
+            try {
+                if (d.includes('/')) {
+                    const parts = d.split('/');
+                    if (parts.length === 3) {
+                        let year = Number(parts[2]);
+                        const month = Number(parts[1]);
+                        const day = Number(parts[0]);
+                        if (year < 100) year += 2000;
+                        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                            return DateTime.fromObject({ year, month, day }, { zone: 'America/Sao_Paulo' }).startOf('day');
+                        }
+                    }
+                } else if (d.includes('-')) {
+                    const isoDate = DateTime.fromISO(d).setZone('America/Sao_Paulo').startOf('day');
+                    if (isoDate.isValid) return isoDate;
                 }
-            } else if (d.includes('-')) {
-                const isoDate = DateTime.fromISO(d).setZone('America/Sao_Paulo').startOf('day');
-                if (isoDate.isValid) return isoDate;
+            } catch (e) {
+                console.error("Error parsing date:", d, e);
             }
             return null;
         };
 
         const waitTimes: number[] = [];
-        const today = DateTime.now().setZone('America/Sao_Paulo').startOf('day');
 
-        patients.forEach(p => {
+        filtered.forEach(p => {
             const start = parseDate(String(p.aihDate || ''));
-            if (start && start.isValid) {
-                const hasSurgery = p.surgeryDate && String(p.surgeryDate).trim() !== '' && String(p.surgeryDate) !== '--';
-                const end = hasSurgery ? parseDate(String(p.surgeryDate)) : today;
+            const hasSurgery = p.surgeryDate && String(p.surgeryDate).trim() !== '' && String(p.surgeryDate) !== '--';
+            if (start && start.isValid && hasSurgery) {
+                const end = parseDate(String(p.surgeryDate));
                 
                 if (end && end.isValid) {
                     const diff = end.diff(start, 'days').days;
@@ -67,19 +97,48 @@ export default function DashboardStats({ patients }: DashboardStatsProps) {
             ? Math.round(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length) 
             : 0;
 
-        return { statusData, teamData, avgWait };
-    }, [patients]);
+        return { statusData, teamData, avgWait, waitCount: waitTimes.length };
+    }, [patients, selectedTeam, selectedSystem]);
 
     const COLORS = ['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#64748b', '#78350f'];
 
     return (
         <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1" htmlFor="team-select">Filtrar por Equipe</label>
+                    <select 
+                        id="team-select"
+                        title="Selecione a Equipe"
+                        aria-label="Filtrar por Equipe"
+                        value={selectedTeam}
+                        onChange={(e) => setSelectedTeam(e.target.value)}
+                        className="w-full mt-1 bg-slate-50 border-2 border-slate-100 p-3 rounded-xl outline-none text-slate-700 font-bold focus:border-blue-500/30 transition-all text-sm"
+                    >
+                        {teams.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                </div>
+                <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1" htmlFor="system-select">Filtrar por Sistema</label>
+                    <select 
+                        id="system-select"
+                        title="Selecione o Sistema"
+                        aria-label="Filtrar por Sistema"
+                        value={selectedSystem}
+                        onChange={(e) => setSelectedSystem(e.target.value)}
+                        className="w-full mt-1 bg-slate-50 border-2 border-slate-100 p-3 rounded-xl outline-none text-slate-700 font-bold focus:border-blue-500/30 transition-all text-sm"
+                    >
+                        {systems.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Summary Card */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Média de Espera (Dias)</span>
                     <span className="text-5xl font-black text-blue-600">{statsData.avgWait}</span>
-                    <p className="text-xs text-slate-500 mt-2 font-medium">De AIH até a Cirurgia</p>
+                    <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider">Baseado em {statsData.waitCount} cirurgia(s)</p>
                 </div>
 
                 {/* Status Pie Chart */}

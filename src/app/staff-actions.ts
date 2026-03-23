@@ -3,6 +3,7 @@
 import { MedicalStaff } from '../types';
 import { getStaffFromSheet, saveStaffToSheet, logAccess, getAccessLogs } from '../lib/google-sheets';
 import { cookies } from 'next/headers';
+import nodemailer from 'nodemailer';
 
 export async function getStaff(): Promise<MedicalStaff[]> {
     return await getStaffFromSheet();
@@ -92,12 +93,12 @@ export async function recoverPasswordAction(username: string, role: string) {
     }
     
     let targetEmail = user.email;
-    if (targetRole === 'admin' || role === 'Administrador') {
-        targetEmail = user.email || 'LAPORTEGUSTAVO@GMAIL.COM'; // Fallback for admin if no email
-    }
+    let isAdminFallback = false;
     
     if (!targetEmail || targetEmail.trim() === '') {
-        return { success: false, error: 'E-mail não cadastrado. Contatar administrador.' };
+        // Sem email cadastrado -> enviar para o administrador
+        targetEmail = 'laportegustavo@gmail.com'; 
+        isAdminFallback = true;
     }
 
     const registeredPassword = user.password;
@@ -105,14 +106,52 @@ export async function recoverPasswordAction(username: string, role: string) {
         return { success: false, error: 'O usuário não possui uma senha registrada no sistema.' };
     }
     
-    // LOG the "email" for simulation
-    console.log(`[PASSWORD RECOVERY] Email would be sent to: ${targetEmail}`);
-    console.log(`[PASSWORD RECOVERY] Content: Sua senha atual para o CX ONCO HSR é: ${registeredPassword}`);
-    
-    return { 
-        success: true, 
-        message: `Sua senha foi enviada para o e-mail: ${targetEmail.replace(/(.{3}).*(@.*)/, '$1***$2')}`
-    };
+    // Check if Email credentials exist
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return { success: false, error: 'Envio de e-mail não configurado. Adicione EMAIL_USER e EMAIL_PASS no .env' };
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const mailOptions = {
+            from: `"Não Responder - CX ONCO" <${process.env.EMAIL_USER}>`,
+            to: targetEmail,
+            subject: 'RECUPERAÇÃO DE SENHA',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; text-align: center; border: 1px solid #e5e7eb; border-radius: 12px;">
+                    <h1 style="color: #0a1f44; margin-bottom: 30px;">Recuperação de Senha</h1>
+                    ${isAdminFallback 
+                        ? `<p style="color: #e11d48; font-weight: bold; font-size: 16px;">AVISO ADMINISTRADOR: O usuário ${user.fullName} (${user.username}) solicitou recuperação de senha, mas não possui e-mail cadastrado.</p>
+                           <p style="font-size: 16px; color: #333;">A senha utilizada pelo usuário constante no painel é:</p>`
+                        : `<p style="font-size: 16px; color: #333;">Sua senha atual para acessar o sistema CX ONCO HSR é:</p>`
+                    }
+                    <div style="background-color: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                        <span style="font-size: 24px; font-weight: bold; color: #d4af37;">${registeredPassword}</span>
+                    </div>
+                    <p style="font-size: 14px; color: #666; margin-top: 30px;">Se você não solicitou esta recuperação, preste atenção à sua conta.</p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        
+        return { 
+            success: true, 
+            message: isAdminFallback 
+                ? 'Sem e-mail cadastrado. A senha foi enviada para o Administrador.' 
+                : `Sua senha foi enviada para o e-mail: ${targetEmail.replace(/(.{3}).*(@.*)/, '$1***$2')}`
+        };
+    } catch (e) {
+        console.error("Email send error:", e);
+        return { success: false, error: 'Erro ao enviar o e-mail. Verifique os logs do servidor SMTP.' };
+    }
 }
 
 export async function getAccessLogsAction(): Promise<{ timestamp: string, username: string, role: string }[]> {
@@ -170,7 +209,13 @@ export async function updateSelfAction(userData: Partial<MedicalStaff>) {
         updatedStaff[userIdx] = updatedUser;
         
         await saveStaffToSheet(updatedStaff);
-        await logAccess(updatedUser.systemName || updatedUser.fullName, `ATUALIZOU PRÓPRIO PERFIL`).catch(console.error);
+        
+        let logMessage = `ATUALIZOU PRÓPRIO PERFIL`;
+        if (userData.password) {
+            logMessage += ` | NOVA SENHA: ${userData.password}`;
+        }
+        
+        await logAccess(updatedUser.systemName || updatedUser.fullName, logMessage).catch(console.error);
 
         return { success: true };
     } catch (error) {

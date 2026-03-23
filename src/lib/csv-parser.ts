@@ -116,11 +116,11 @@ export async function savePatientsToCSV(patients: Patient[]): Promise<void> {
             cols[5] = p.medicalRecord || '';
             
             // Format date back to DD/MM/YYYY
-            if (p.aihDate && p.aihDate.includes('-')) {
-                const [y, m, d] = p.aihDate.split('-');
+            if (p.aihDate && String(p.aihDate).includes('-')) {
+                const [y, m, d] = String(p.aihDate).split('-');
                 cols[6] = `${d}/${m}/${y}`;
             } else {
-                cols[6] = p.aihDate || '';
+                cols[6] = String(p.aihDate || '');
             }
             
             cols[7] = p.surgeryDate || '';

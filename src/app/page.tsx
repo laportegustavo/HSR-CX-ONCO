@@ -366,10 +366,12 @@ export default function Dashboard() {
         if (field.id === 'name') {
             return (
                 <div className="flex flex-col">
-                    <span className="text-sm transition-colors text-black font-semibold">
+                    <span className="text-sm transition-colors text-black font-semibold uppercase">
                         {String(value || '--')}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">{patient.medicalRecord}</span>
+                    <span className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">
+                        {patient.age ? `${patient.age} anos` : ''}
+                    </span>
                 </div>
             );
         }
@@ -850,7 +852,7 @@ export default function Dashboard() {
                                             </div>
                                             
                                             <div className="mb-2 sm:mb-4">
-                                                <h4 className="text-sm sm:text-base font-bold text-slate-800 leading-tight mb-0.5 sm:mb-1">{patient.name}</h4>
+                                                <h4 className="text-sm sm:text-base font-bold text-slate-800 leading-tight mb-0.5 sm:mb-1 uppercase">{patient.name}</h4>
                                                 <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prontuário: {patient.medicalRecord}</p>
                                             </div>
 
@@ -925,7 +927,7 @@ export default function Dashboard() {
                                                     'border-l-emerald-500'
                                                 }`}
                                             >
-                                                <p className={`text-xs font-bold mb-1 truncate ${getPriorityStyle(String(p.priority || '3'))}`}>{p.name}</p>
+                                                <p className={`text-xs font-bold mb-1 truncate uppercase ${getPriorityStyle(String(p.priority || '3'))}`}>{p.name}</p>
                                                 <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
                                                     <span className="truncate max-w-[120px]">{p.team}</span>
                                                     <span className="font-mono">{p.medicalRecord}</span>

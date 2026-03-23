@@ -190,8 +190,10 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                                     try {
                                         const parseDate = (d: string) => {
                                             if (d.includes('-')) return new Date(d);
-                                            const [day, month, year] = d.split('/');
-                                            return new Date(`${year}-${month}-${day}`);
+                                            const parts = d.split('/');
+                                            let year = Number(parts[2]);
+                                            if (year < 100) year += 2000;
+                                            return new Date(year, Number(parts[1]) - 1, Number(parts[0]));
                                         };
                                         const date1 = parseDate(aih);
                                         const date2 = parseDate(surg);
@@ -206,12 +208,12 @@ export default function ReportModal({ patients, isOpen, onClose }: ReportModalPr
                                     <tr class="priority-${p.priority || '3'}">
                                         ${columns.map(c => {
                                             if (c.key === 'waitTime') {
-                                                return `<td>${calculateWait(p.aihDate || '', p.surgeryDate || '')}</td>`;
+                                                return `<td>${calculateWait(String(p.aihDate || ''), String(p.surgeryDate || ''))}</td>`;
                                             }
                                             if (c.key === 'auxiliaryResidents') {
-                                                return `<td>${(p.auxiliaryResidents || []).join(', ') || '--'}</td>`;
+                                                return `<td>${((p.auxiliaryResidents as string[]) || []).join(', ') || '--'}</td>`;
                                             }
-                                            return `<td>${p[c.key as keyof Patient] || '--'}</td>`;
+                                            return `<td>${String(p[c.key as keyof typeof p] || '--')}</td>`;
                                         }).join('')}
                                     </tr>
                                 `;

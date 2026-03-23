@@ -71,7 +71,9 @@ function autoCalculateWaitTime(aih: unknown, surg: unknown): string {
         if (d.includes('/')) {
             const parts = d.split('/');
             if (parts.length === 3) {
-                return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                let year = Number(parts[2]);
+                if (year < 100) year += 2000;
+                return new Date(year, Number(parts[1]) - 1, Number(parts[0]));
             }
         } else if (d.includes('-')) {
             const parts = d.split('-');
@@ -86,7 +88,9 @@ function autoCalculateWaitTime(aih: unknown, surg: unknown): string {
     if (!start || isNaN(start.getTime())) return '';
 
     const hasSurgery = sSurg && sSurg !== '--';
-    const end = hasSurgery ? parseDate(sSurg) : new Date();
+    if (!hasSurgery) return '';
+
+    const end = parseDate(sSurg);
 
     if (!end || isNaN(end.getTime())) return '';
 
