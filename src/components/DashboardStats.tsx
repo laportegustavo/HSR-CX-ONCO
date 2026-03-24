@@ -90,23 +90,24 @@ export default function DashboardStats({ patients, activeTeams }: DashboardStats
         const waitTimes: number[] = [];
 
         filtered.forEach(p => {
-            // First priority: pre-calculated field from DB/migration
-            if (typeof p.waitTimeDays === 'number' && p.waitTimeDays > 0) {
-                waitTimes.push(p.waitTimeDays);
-                return;
-            }
-
-            // Second priority: dynamic calculation if dates are present
             const start = parseDate(String(p.aihDate || ''));
             const hasSurgery = p.surgeryDate && String(p.surgeryDate).trim() !== '' && String(p.surgeryDate) !== '--';
             
+            // First priority: dynamic calculation if dates are present and valid
             if (start && start.isValid && hasSurgery) {
                 const end = parseDate(String(p.surgeryDate));
-                
                 if (end && end.isValid) {
                     const diff = end.diff(start, 'days').days;
-                    if (diff >= 0) waitTimes.push(Math.floor(diff));
+                    if (diff >= 0 && diff < 1000) {
+                        waitTimes.push(Math.floor(diff));
+                        return;
+                    }
                 }
+            }
+
+            // Second priority: pre-calculated field from DB/migration (capped for safety)
+            if (typeof p.waitTimeDays === 'number' && p.waitTimeDays > 0 && p.waitTimeDays < 1000) {
+                waitTimes.push(p.waitTimeDays);
             }
         });
 
