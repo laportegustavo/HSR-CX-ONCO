@@ -17,6 +17,23 @@ async function getCurrentUser() {
 
 // Positions are handled locally or via recalculateAllPositionsAction
 
+function normalizeDate(dateStr: string | null | undefined): string {
+    if (!dateStr || dateStr === '--') return '--';
+    const s = String(dateStr).trim();
+    if (!s) return '--';
+
+    // Se já estiver no formato dd/mm/aaaa, retorna
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+
+    // Caso aaaa-mm-dd (ISO) ou aaaa/mm/dd
+    const isoMatch = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+    if (isoMatch) {
+        return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+    }
+
+    return s;
+}
+
 function autoCalculateWaitTime(aih: string | null | undefined, surg: string | null | undefined): number {
     const sAih = String(aih || '').trim();
     const sSurg = String(surg || '').trim();
@@ -77,11 +94,15 @@ export async function createPatientAction(patientData: Omit<Patient, 'id'>) {
         const lastId = patients.length > 0 ? Math.max(...patients.map(p => parseInt(String(p.id)) || 0)) : 0;
         const newId = (lastId + 1).toString();
 
-        const waitTime = autoCalculateWaitTime(patientData.aihDate as string, patientData.surgeryDate as string);
+        const aihDate = normalizeDate(patientData.aihDate as string);
+        const surgeryDate = normalizeDate(patientData.surgeryDate as string);
+        const waitTime = autoCalculateWaitTime(aihDate, surgeryDate);
 
         const newPatient: Patient = {
             ...(patientData as Patient),
             id: newId,
+            aihDate,
+            surgeryDate,
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: decodedName,
             waitTime: String(waitTime)
@@ -130,10 +151,14 @@ export async function updatePatientAction(patient: Patient) {
             await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name} (${changedFields.join(', ')})`).catch(console.error);
         }
 
-        const waitTime = autoCalculateWaitTime(patient.aihDate as string, patient.surgeryDate as string);
+        const aihDate = normalizeDate(patient.aihDate as string);
+        const surgeryDate = normalizeDate(patient.surgeryDate as string);
+        const waitTime = autoCalculateWaitTime(aihDate, surgeryDate);
 
         const updatedPatient = {
             ...patient,
+            aihDate,
+            surgeryDate,
             waitTime: String(waitTime),
             lastUpdated: new Date().toISOString(),
             lastUpdatedBy: decodedName
@@ -177,7 +202,14 @@ export async function getPatientChangeLogsAction() {
 
 export async function recalculateAllPositionsAction() {
     try {
-        const patients = await getPatientsFromSheet();
+        const rawPatients = await getPatientsFromSheet();
+        
+        // Normaliza formatos de data de todos os pacientes antes de processar
+        const patients = rawPatients.map(p => ({
+            ...p,
+            aihDate: normalizeDate(String(p.aihDate || '--')),
+            surgeryDate: normalizeDate(String(p.surgeryDate || '--'))
+        } as Patient));
         
         // Separa pacientes ativos (que entram na contagem) dos inativos
         const activePatients = patients.filter(p => 
