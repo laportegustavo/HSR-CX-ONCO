@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -30,12 +30,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
             <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100 ring-1 ring-slate-200/50">
                 {label && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>}
                 <div className="flex items-center gap-2">
-                    <div 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ color: payload[0].color || '#3b82f6' } as React.CSSProperties} 
-                    >
-                        <div className="w-full h-full rounded-full bg-current" />
-                    </div>
+                    <TooltipDot color={payload[0].color || '#3b82f6'} />
                     <p className="text-sm font-black text-slate-800">
                         {payload[0].value} <span className="text-slate-400 font-bold ml-1">pacientes</span>
                     </p>
@@ -44,6 +39,16 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
         );
     }
     return null;
+};
+
+const TooltipDot = ({ color }: { color: string }) => {
+    const ref = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (ref.current) {
+            ref.current.style.backgroundColor = color;
+        }
+    }, [color]);
+    return <div ref={ref} className="w-2 h-2 rounded-full" />;
 };
 
 export default function DashboardStats({ patients, activeTeams }: DashboardStatsProps) {
