@@ -5,6 +5,7 @@ import { logAccess, getFieldSchema } from '../lib/google-sheets';
 import { logPatientChange, logPatientAction, getPatientChangeLogs } from '../lib/audit-log';
 import { Patient } from '../types';
 import { cookies } from 'next/headers';
+import { Role } from '@prisma/client';
 
 // Helper to get HSR Tenant
 async function getHSRTenantId() {
@@ -12,6 +13,17 @@ async function getHSRTenantId() {
         where: { name: "HSR - SUS CX ONCO" }
     });
     return tenant?.id;
+}
+
+async function getCurrentUser() {
+    const cookieStore = await cookies();
+    const username = cookieStore.get('username')?.value;
+    if (!username) return null;
+
+    return await prisma.user.findUnique({
+        where: { username },
+        include: { tenant: true }
+    });
 }
 
 /**
@@ -110,11 +122,20 @@ function autoCalculateWaitTime(aih: string | null | undefined, surg: string | nu
 }
 
 export async function getPatientsAction(): Promise<Patient[]> {
-    const tenantId = await getHSRTenantId();
-    if (!tenantId) return [];
+    const user = await getCurrentUser() as any;
+    if (!user) return [];
+
+    const whereClause: any = { tenantId: user.tenantId };
+    
+    // Level 2: Service Admin (Service Chief) - Filter by their team only
+    if ((user.role as string) === 'SERVICE_ADMIN' && user.serviceId) {
+        whereClause.teamId = user.serviceId;
+    }
+    // Level 3/4: Staff (Preceptor/Resident) - Currently also filtered by service in the UI/logic
+    // but the Hospital Admin (HOSPITAL_ADMIN) sees EVERYTHING (whereClause.teamId is not set)
 
     const patients = await prisma.patient.findMany({
-        where: { tenantId },
+        where: whereClause,
         include: { team: true },
         orderBy: [
             { position: 'asc' },

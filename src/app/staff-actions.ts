@@ -6,6 +6,7 @@ import { logAccess } from '../lib/google-sheets';
 import { cookies } from 'next/headers';
 import nodemailer from 'nodemailer';
 import { getAccessLogs } from '../lib/audit-log';
+import { Role } from '@prisma/client';
 
 // Helper to get HSR Tenant
 async function getHSRTenantId() {
@@ -15,8 +16,29 @@ async function getHSRTenantId() {
     return tenant?.id;
 }
 
+async function getCurrentUser() {
+    const cookieStore = await cookies();
+    const username = cookieStore.get('username')?.value;
+    if (!username) return null;
+
+    return await prisma.user.findUnique({
+        where: { username }
+    });
+}
+
 export async function getStaff(): Promise<MedicalStaff[]> {
+    const user = await getCurrentUser() as any;
+    if (!user) return [];
+
+    const whereClause: any = { tenantId: user.tenantId };
+    
+    // Level 2: Service Admin (Service Chief) - Can only see staff in their service
+    if (user.role === 'SERVICE_ADMIN' && user.serviceId) {
+        whereClause.serviceId = user.serviceId;
+    }
+
     const users = await prisma.user.findMany({
+        where: whereClause,
         orderBy: { fullName: 'asc' }
     });
 
@@ -25,11 +47,12 @@ export async function getStaff(): Promise<MedicalStaff[]> {
         username: u.username,
         fullName: u.fullName,
         email: u.email || '',
-        password: u.passwordHash, // Legado: chamamos de password no MedicalStaff
-        type: u.role.toLowerCase(), // admin, preceptor, resident
+        password: u.passwordHash,
+        type: u.role.toLowerCase() as any,
         crm: u.crm || '',
         phone: u.phone || '',
-        systemName: u.systemName || u.fullName
+        systemName: u.systemName || u.fullName,
+        serviceId: u.serviceId || undefined
     })) as MedicalStaff[];
 }
 
@@ -38,13 +61,15 @@ export async function saveStaffAction(staffMember: MedicalStaff | Omit<MedicalSt
         const tenantId = await getHSRTenantId();
         if (!tenantId) throw new Error("Tenant não encontrado");
 
-        const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
-            'admin': 'ADMIN',
+        const roleMap: Record<string, 'HOSPITAL_ADMIN' | 'SERVICE_ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
+            'hospital_admin': 'HOSPITAL_ADMIN',
+            'service_admin': 'SERVICE_ADMIN',
             'preceptor': 'PRECEPTOR',
-            'resident': 'RESIDENT'
+            'resident': 'RESIDENT',
+            'admin': 'HOSPITAL_ADMIN' // Fallback for legacy
         };
 
-        const data = {
+        const data: any = {
             username: staffMember.username || `user_${Math.random().toString(36).substring(7)}`,
             fullName: staffMember.fullName,
             email: staffMember.email || `${staffMember.username || 'user'}@hsr-onco.com`,
@@ -54,7 +79,8 @@ export async function saveStaffAction(staffMember: MedicalStaff | Omit<MedicalSt
             phone: staffMember.phone || "",
             systemName: staffMember.systemName || staffMember.fullName,
             tenantId,
-            lgpdAccepted: true
+            lgpdAccepted: true,
+            serviceId: staffMember.serviceId || null
         };
 
         if ('id' in staffMember && staffMember.id) {
@@ -88,11 +114,11 @@ export async function deleteStaffAction(id: string) {
 }
 
 export async function validateLoginAction(username: string, password: string, role: string) {
-    // Role mapping from Login UI to storage type
-    const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
-        'Administrador': 'ADMIN',
-        'Médico Preceptor': 'PRECEPTOR',
-        'Médico Residente': 'RESIDENT'
+    const roleMap: Record<string, Role> = {
+        'Administrador Hospital': Role.HOSPITAL_ADMIN,
+        'Administrador Serviço': Role.SERVICE_ADMIN,
+        'Médico Preceptor': Role.PRECEPTOR,
+        'Médico Residente': Role.RESIDENT
     };
     
     const targetRole = roleMap[role];
@@ -103,7 +129,7 @@ export async function validateLoginAction(username: string, password: string, ro
                 { username: username },
                 { email: username }
             ],
-            passwordHash: password, // Note: No MD5/Bcrypt yet as requested to keep legacy compat
+            passwordHash: password, 
             role: targetRole
         }
     });
@@ -115,7 +141,7 @@ export async function validateLoginAction(username: string, password: string, ro
         cookieStore.set('username', encodeURIComponent(user.fullName), { path: '/', maxAge: 60 * 60 * 24 });
         cookieStore.set('role', role, { path: '/', maxAge: 60 * 60 * 24 });
         cookieStore.set('tenantId', user.tenantId, { path: '/', maxAge: 60 * 60 * 24 });
-        cookieStore.set('isSuperAdmin', String(!!user.isSuperAdmin), { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('isSuperAdmin', String(!!(user as any).isSuperAdmin), { path: '/', maxAge: 60 * 60 * 24 });
 
         logAccess(user.systemName || user.fullName, role).catch(console.error);
         return { success: true, user: { id: user.id, fullName: user.fullName, role: role } };
@@ -125,10 +151,11 @@ export async function validateLoginAction(username: string, password: string, ro
 }
 
 export async function recoverPasswordAction(username: string, role: string) {
-    const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
-        'Administrador': 'ADMIN',
-        'Médico Preceptor': 'PRECEPTOR',
-        'Médico Residente': 'RESIDENT'
+    const roleMap: Record<string, Role> = {
+        'Administrador Hospital': Role.HOSPITAL_ADMIN,
+        'Administrador Serviço': Role.SERVICE_ADMIN,
+        'Médico Preceptor': Role.PRECEPTOR,
+        'Médico Residente': Role.RESIDENT
     };
     
     const targetRole = roleMap[role];

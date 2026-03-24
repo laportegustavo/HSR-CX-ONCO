@@ -38,7 +38,8 @@ export interface MedicalStaff {
   systemName: string;
   phone?: string;
   email?: string;
-  type: 'preceptor' | 'resident' | 'admin';
+  type: 'preceptor' | 'resident' | 'admin' | 'hospital_admin' | 'service_admin';
   username?: string;
   password?: string;
+  serviceId?: string;
 }

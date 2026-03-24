@@ -19,7 +19,8 @@ enum PlanType {
 }
 
 enum Role {
-  ADMIN
+  HOSPITAL_ADMIN
+  SERVICE_ADMIN
   PRECEPTOR
   RESIDENT
 }
@@ -69,6 +70,7 @@ model Team {
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   patients    Patient[]
+  users       User[]
 }
 
 // ----------------------------------------------------------------------
@@ -90,6 +92,9 @@ model User {
 
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  serviceId    String?
+  service      Team?    @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

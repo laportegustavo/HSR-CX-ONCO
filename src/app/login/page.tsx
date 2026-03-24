@@ -10,7 +10,7 @@ import Image from "next/image";
 import { LucideIcon } from "lucide-react";
 import { validateLoginAction, recoverPasswordAction } from "../staff-actions";
 
-type UserRole = 'Administrador' | 'Médico Preceptor' | 'Médico Residente';
+type UserRole = 'Administrador Hospital' | 'Administrador Serviço' | 'Médico Preceptor' | 'Médico Residente';
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -79,7 +79,8 @@ export default function LoginPage() {
     };
 
     const roles: { id: UserRole, icon: LucideIcon, label: string, color: string }[] = [
-        { id: 'Administrador', icon: ShieldCheck, label: 'Admin', color: 'blue' },
+        { id: 'Administrador Hospital', icon: ShieldCheck, label: 'Hosp.', color: 'blue' },
+        { id: 'Administrador Serviço', icon: ShieldCheck, label: 'Serv.', color: 'purple' },
         { id: 'Médico Preceptor', icon: Stethoscope, label: 'Preceptor', color: 'indigo' },
         { id: 'Médico Residente', icon: Users, label: 'Residente', color: 'sky' }
     ];
@@ -253,7 +254,7 @@ export default function LoginPage() {
                         <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
                             <Info size={20} className="text-blue-500 shrink-0" />
                             <p className="text-[10px] text-blue-700 leading-relaxed font-semibold">
-                                {selectedRole === 'Administrador' 
+                                {selectedRole === 'Administrador Hospital' 
                                     ? "Administradores receberão a nova senha em: LAPORTEGUSTAVO@GMAIL.COM" 
                                     : "A nova senha será enviada para o e-mail cadastrado no sistema."}
                             </p>
