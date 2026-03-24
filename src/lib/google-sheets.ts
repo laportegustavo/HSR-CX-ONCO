@@ -84,6 +84,7 @@ const INITIAL_SCHEMA: FieldSchema[] = [
     { id: 'hospital', label: 'Local da Cirurgia', type: 'select', column: 26, isVisibleInCalendar: true, isRequired: false, order: 27, options: [] },
     { id: 'operatingRoom', label: 'Sala Cirúrgica', type: 'text', column: 27, isVisibleInCalendar: true, isRequired: false, order: 28 },
     { id: 'surgeryTime', label: 'Horário da Cirurgia', type: 'time', column: 28, isVisibleInCalendar: true, isRequired: false, order: 29 },
+    { id: 'procedimentoProposto', label: 'Procedimento Proposto', type: 'textarea', column: 31, isVisibleInCalendar: false, isRequired: false, order: 30 },
 ];
 
 export async function ensureSheetExists(title: string, headers: string[]) {

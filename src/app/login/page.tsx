@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
-    Lock, User, ShieldCheck, 
-    Stethoscope, Users, Eye, EyeOff, 
+    Lock, User, 
+    Eye, EyeOff, 
     ChevronRight, Loader2, Info
 } from "lucide-react";
 import Image from "next/image";
-import { LucideIcon } from "lucide-react";
 import { validateLoginAction, recoverPasswordAction } from "../staff-actions";
 
-type UserRole = 'Administrador Hospital' | 'Administrador Serviço' | 'Médico Preceptor' | 'Médico Residente';
+// type UserRole... (removed as it's now database-driven)
 
 export default function LoginPage() {
     const [username, setUsername] = useState("");
@@ -18,72 +18,79 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<UserRole>('Médico Preceptor');
+    // const [selectedRole, setSelectedRole] = useState<UserRole>('Médico Preceptor');
     const [isMounted, setIsMounted] = useState(false);
-    const [isForgotMode, setIsForgotMode] = useState(false);
-    const [recoveryMessage, setRecoveryMessage] = useState("");
-    const [recoveryError, setRecoveryError] = useState("");
+    const [role, setRole] = useState('Residente'); 
+    const [isForgotMode, setIsForgotMode] = useState(false); 
+    const [recoverUsername, setRecoverUsername] = useState(''); // New state for recovery username
+    const [recoverRole, setRecoverRole] = useState('Residente'); // New state for recovery role
+    const [recoveryMessage, setRecoveryMessage] = useState(""); // Re-added for recovery messages
+    const [recoveryError, setRecoveryError] = useState(""); // Re-added for recovery errors
+    const [recoverLoading, setRecoverLoading] = useState(false); // New state for recovery loading
+
+    const router = useRouter();
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        setError("");
-        
+        setError('');
+
         try {
-            const result = await validateLoginAction(username, password, selectedRole);
-            
+            const result = await validateLoginAction(username, password, role);
             if (result.success) {
                 const expiry = new Date();
                 expiry.setDate(expiry.getDate() + 7);
                 
                 document.cookie = `auth=true; path=/; expires=${expiry.toUTCString()}`;
-                document.cookie = `role=${selectedRole}; path=/; expires=${expiry.toUTCString()}`;
+                document.cookie = `role=${result.user?.role}; path=/; expires=${expiry.toUTCString()}`;
                 document.cookie = `username=${encodeURIComponent(username)}; path=/; expires=${expiry.toUTCString()}`;
                 document.cookie = `fullname=${encodeURIComponent(result.user?.fullName || "")}; path=/; expires=${expiry.toUTCString()}`;
+                document.cookie = `isSuperAdmin=${result.user?.isSuperAdmin}; path=/; expires=${expiry.toUTCString()}`;
                 
-                
-                window.location.href = "/";
+                if (result.user?.role?.includes("Administrador")) {
+                    router.push("/admin");
+                } else {
+                    router.push("/");
+                }
             } else {
-                setError(result.error || "Erro ao realizar login");
-                setIsLoading(false);
+                setError(result.error || 'Erro ao entrar');
             }
         } catch (err) {
             console.error(err);
-            setError("Erro de conexão com o servidor");
-            setIsLoading(false);
-        }
-    };
-
-    const handleRecoverPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setRecoveryError("");
-        setRecoveryMessage("");
-
-        try {
-            const result = await recoverPasswordAction(username, selectedRole);
-            if (result.success) {
-                setRecoveryMessage(result.message || "Nova senha enviada!");
-            } else {
-                setRecoveryError(result.error || "Erro ao recuperar senha");
-            }
-        } catch {
-            setError('Ocorreu um erro ao tentar fazer login. Tente novamente.');
+            setError('Erro de conexão');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const roles: { id: UserRole, icon: LucideIcon, label: string, color: string }[] = [
-        { id: 'Administrador Hospital', icon: ShieldCheck, label: 'Hosp.', color: 'blue' },
-        { id: 'Administrador Serviço', icon: ShieldCheck, label: 'Serv.', color: 'purple' },
-        { id: 'Médico Preceptor', icon: Stethoscope, label: 'Preceptor', color: 'indigo' },
-        { id: 'Médico Residente', icon: Users, label: 'Residente', color: 'sky' }
-    ];
+    const handleRecover = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setRecoverLoading(true);
+        setRecoveryMessage('');
+        setRecoveryError('');
+
+        try {
+            const result = await recoverPasswordAction(recoverUsername, recoverRole);
+            if (result.success) {
+                setRecoveryMessage(result.message || 'Senha enviada com sucesso');
+            } else {
+                setRecoveryError(result.error || 'Erro ao recuperar senha');
+            }
+        } catch (err) {
+            console.error(err);
+            setRecoveryError('Erro de conexão');
+        } finally {
+            setRecoverLoading(false);
+        }
+    };
+
+    /* 
+    const roles: { id: UserRole, icon: LucideIcon, label: string, color: string }[] = ...
+    */
 
     if (!isMounted) return null;
 
@@ -95,28 +102,27 @@ export default function LoginPage() {
             <div className={`w-full max-w-[480px] z-10 transition-all duration-1000 transform ${isMounted ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
                 <div className="flex flex-col items-center mb-10 text-center scale-90 sm:scale-100">
                     <div className="bg-white p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] mb-8 transform transition-all hover:scale-105 hover:rotate-2 duration-500 border border-white/20">
-                        <div className="w-32 h-32 sm:w-40 sm:h-40 relative">
-                            <Image 
-                                src="/logo-hsr.jpeg"
-                                alt="Hospital Santa Rita"
-                                width={160}
-                                height={160}
-                                className="object-contain"
-                                priority
-                            />
+                        <div className="flex flex-col items-center mb-8">
+                            <div className="relative w-32 h-32 mb-4">
+                                <Image
+                                    src="/logo-hsr.jpeg"
+                                    alt="HSR Logo"
+                                    fill
+                                    className="object-contain"
+                                    priority
+                                />
+                            </div>
+                            <h1 className="text-3xl font-bold text-[#0a1f44] tracking-tight">
+                                HSR - SUS CX-ONCO
+                            </h1>
+                            <p className="text-slate-500 font-medium">Controle de Fila Cirúrgica</p>
                         </div>
                     </div>
                     <div className="space-y-1">
-                        <h1 className="text-4xl font-black text-white tracking-tight uppercase bg-gradient-to-r from-white to-[#d4af37] bg-clip-text text-transparent">
-                            CX ONCO HSR
-                        </h1>
-                        <p className="text-[#d4af37]/80 text-sm font-semibold tracking-[0.05em] px-2 py-0.5 rounded-full bg-[#0a1f44]/40 inline-block border border-[#d4af37]/20">
-                            Serviço de Cirurgia Oncológica
-                        </p>
-                        <div className="flex items-center justify-center gap-2 mt-2">
+                        <div className="flex items-center justify-center gap-2 mt-4">
                             <div className="h-px w-8 bg-blue-500/30" />
                             <p className="text-blue-400/60 text-[10px] font-black uppercase tracking-[0.25em]">
-                                Hospital Santa Rita
+                                Surgery Queue Management
                             </p>
                             <div className="h-px w-8 bg-blue-500/30" />
                         </div>
@@ -135,50 +141,62 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    <div className="space-y-3 mb-10">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Acesso</label>
-                        <div className="grid grid-cols-3 gap-3 p-1.5 bg-slate-100/80 rounded-3xl border border-slate-200">
-                            {roles.map((role) => (
-                                <button
-                                    key={role.id}
-                                    type="button"
-                                    onClick={() => setSelectedRole(role.id)}
-                                    className={`relative flex flex-col items-center justify-center py-4 px-1 rounded-[1.5rem] transition-all duration-500 ${
-                                        selectedRole === role.id 
-                                        ? "bg-white text-blue-600 shadow-[0_8px_20px_rgba(0,0,0,0.1)] scale-[1.05] z-10" 
-                                        : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
-                                    }`}
-                                >
-                                    <role.icon size={22} className={`transition-all duration-500 ${selectedRole === role.id ? "scale-110" : "opacity-70"}`} />
-                                    <span className="text-[9px] font-black mt-2 uppercase tracking-tight">{role.label}</span>
-                                    {selectedRole === role.id && (
-                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-600 rounded-full" />
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    {/* Role Selection removed */}
 
-                    <form onSubmit={isForgotMode ? handleRecoverPassword : handleLogin} className="space-y-6">
+                    <form onSubmit={isForgotMode ? handleRecover : handleSubmit} className="space-y-6">
+                        {!isForgotMode && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo de Acesso</label>
+                                <select
+                                    value={role}
+                                    onChange={(e) => setRole(e.target.value)}
+                                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)]"
+                                    required
+                                    disabled={isLoading}
+                                >
+                                    <option value="Médico Residente">Médico Residente</option>
+                                    <option value="Médico Preceptor">Médico Preceptor</option>
+                                    <option value="Administrador">Administrador</option>
+                                </select>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label htmlFor="username" className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Identificação</label>
                             <div className="relative group/input">
-                                <div className={`absolute left-5 top-1/2 -translate-y-1/2 transition-all duration-300 ${username ? 'text-blue-600 scale-110' : 'text-slate-300 group-focus-within/input:text-blue-500'}`}>
+                                <div className={`absolute left-5 top-1/2 -translate-y-1/2 transition-all duration-300 ${isForgotMode ? recoverUsername ? 'text-blue-600 scale-110' : 'text-slate-300 group-focus-within/input:text-blue-500' : username ? 'text-blue-600 scale-110' : 'text-slate-300 group-focus-within/input:text-blue-500'}`}>
                                     <User size={20} strokeWidth={2.5} />
                                 </div>
                                 <input
                                     type="text"
                                     id="username"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    autoComplete="username"
+                                    value={isForgotMode ? recoverUsername : username}
+                                    onChange={(e) => isForgotMode ? setRecoverUsername(e.target.value) : setUsername(e.target.value)}
+                                    autoComplete={isForgotMode ? "email" : "username"}
                                     className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 pl-14 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)] placeholder:text-slate-300"
                                     placeholder="Usuário ou E-mail"
                                     required
-                                    disabled={isLoading}
+                                    disabled={isLoading || recoverLoading}
                                 />
                             </div>
                         </div>
+
+                        {isForgotMode && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Tipo de Perfil</label>
+                                <select
+                                    value={recoverRole}
+                                    onChange={(e) => setRecoverRole(e.target.value)}
+                                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)]"
+                                    required
+                                    disabled={isLoading || recoverLoading}
+                                >
+                                    <option value="Médico Residente">Médico Residente</option>
+                                    <option value="Médico Preceptor">Médico Preceptor</option>
+                                    <option value="Administrador">Administrador</option>
+                                </select>
+                            </div>
+                        )}
 
                         {!isForgotMode && (
                             <div className="space-y-2">
@@ -195,7 +213,7 @@ export default function LoginPage() {
                                         autoComplete="current-password"
                                         className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 pl-14 pr-14 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)] placeholder:text-slate-300 tracking-[0.2em]"
                                         placeholder="••••••••"
-                                        required={!isForgotMode}
+                                        required
                                         disabled={isLoading}
                                     />
                                     <button 
@@ -254,9 +272,7 @@ export default function LoginPage() {
                         <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3">
                             <Info size={20} className="text-blue-500 shrink-0" />
                             <p className="text-[10px] text-blue-700 leading-relaxed font-semibold">
-                                {selectedRole === 'Administrador Hospital' 
-                                    ? "Administradores receberão a nova senha em: LAPORTEGUSTAVO@GMAIL.COM" 
-                                    : "A nova senha será enviada para o e-mail cadastrado no sistema."}
+                                A nova senha será enviada para o e-mail cadastrado no sistema.
                             </p>
                         </div>
                     )}
@@ -270,14 +286,14 @@ export default function LoginPage() {
 
                     <div className="mt-12 text-center pt-8 border-t border-slate-100/50">
                         <p className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em]">
-                            Todos os direitos para Gustavo Andreazza Laporte
+                            Gustavo Andreazza Laporte - Todos direitos reservados
                         </p>
                     </div>
                 </div>
                 
                 <div className="mt-12 text-center space-y-2">
                     <p className="text-[#d4af37]/50 text-[10px] font-black uppercase tracking-[0.4em]">
-                        MedExpert Integrated System
+                        HSR - SUS CX-ONCO
                     </p>
                     <div className="flex items-center justify-center gap-4 text-[9px] font-bold text-blue-500/20 uppercase tracking-widest">
                         <span>Segurança SSL</span>

@@ -42,4 +42,5 @@ export interface MedicalStaff {
   username?: string;
   password?: string;
   serviceId?: string;
+  lgpdAccepted?: boolean;
 }

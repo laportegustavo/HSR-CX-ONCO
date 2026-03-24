@@ -125,6 +125,9 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                     <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-100">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Prontos
                     </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-yellow-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div> Round
+                    </div>
                     <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-wider border border-orange-100">
                         <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Realizadas
                     </div>
@@ -186,6 +189,7 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                         const top = getTimeOffset(patient.surgeryTime ? String(patient.surgeryTime) : undefined) ?? (10 + (pIdx * 50));
                                         const isSurgeryDone = patient.status === 'CIRURGIA REALIZADA';
                                         const isReady = patient.status === 'PRONTOS';
+                                        const isRound = patient.status === 'DISCUTIR EM ROUND';
                                         
                                         // Robust check for hospital/room
                                         const hasHospital = patient.hospital && String(patient.hospital).trim() !== "" && patient.hospital !== "--";
@@ -202,7 +206,9 @@ export default function CalendarView({ patients, onPatientClick }: CalendarViewP
                                                         ? 'bg-white border-l-orange-500 shadow-orange-100/30' 
                                                         : isReady 
                                                             ? 'bg-white border-l-emerald-500 shadow-emerald-100/30' 
-                                                            : 'bg-white border-l-blue-500 shadow-blue-100/30'
+                                                            : isRound
+                                                                ? 'bg-white border-l-yellow-500 shadow-yellow-100/30'
+                                                                : 'bg-white border-l-blue-500 shadow-blue-100/30'
                                                 }`}
                                             >
                                                 <div className="flex flex-col h-full justify-start gap-1 overflow-hidden">

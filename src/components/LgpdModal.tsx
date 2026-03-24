@@ -25,12 +25,15 @@ export default function LgpdModal({ userName, onAccept }: LgpdModalProps) {
     };
 
     useEffect(() => {
-        if (contentRef.current) {
-            const { scrollHeight, clientHeight } = contentRef.current;
-            if (scrollHeight <= clientHeight + 5) {
-                setScrolledToBottom(true);
+        const checkInitialScroll = () => {
+            if (contentRef.current) {
+                const { scrollHeight, clientHeight } = contentRef.current;
+                if (scrollHeight <= clientHeight + 5) {
+                    setScrolledToBottom(true);
+                }
             }
-        }
+        };
+        checkInitialScroll();
     }, []);
 
     const handleAcceptClick = async () => {

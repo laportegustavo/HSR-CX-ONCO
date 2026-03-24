@@ -11,6 +11,7 @@ export default function FieldManager() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [fieldToDelete, setFieldToDelete] = useState<FieldSchema | null>(null);
 
     useEffect(() => {
         loadFields();
@@ -53,11 +54,17 @@ export default function FieldManager() {
     const handleDeleteField = (id: string) => {
         const field = fields.find(f => f.id === id);
         if (field?.isSystem) {
-            alert("Este campo é do sistema e não pode ser excluído.");
+            setMessage({ type: 'error', text: "Este campo é do sistema e não pode ser excluído." });
+            setTimeout(() => setMessage(null), 3000);
             return;
         }
-        if (confirm(`Excluir o campo "${field?.label}"? Os dados no Google Sheets não serão apagados, mas o campo não aparecerá mais no sistema.`)) {
-            setFields(fields.filter(f => f.id !== id));
+        setFieldToDelete(field || null);
+    };
+
+    const confirmDeleteField = () => {
+        if (fieldToDelete) {
+            setFields(fields.filter(f => f.id !== fieldToDelete.id));
+            setFieldToDelete(null);
         }
     };
 
@@ -258,6 +265,36 @@ export default function FieldManager() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Confirmação de Exclusão de Campo */}
+            {fieldToDelete && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-blue-950/40 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center animate-in zoom-in-95 duration-200">
+                        <div className="mx-auto w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6">
+                            <Trash2 size={32} />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">Excluir Campo</h3>
+                        <p className="text-sm font-medium text-slate-500 mb-8 leading-relaxed">
+                            Tem certeza que deseja excluir o campo <b className="text-slate-800 text-base">&quot;{fieldToDelete.label}&quot;</b>? 
+                            <span className="block mt-2 text-[10px] uppercase font-black text-slate-400">Os dados permanecerão no Google Sheets, mas o campo não será mais exibido.</span>
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setFieldToDelete(null)}
+                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={confirmDeleteField}
+                                className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20 active:scale-95"
+                            >
+                                Sim, Excluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

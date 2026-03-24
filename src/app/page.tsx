@@ -5,7 +5,7 @@ import {
     Search, Activity, RefreshCw, LayoutList, LayoutGrid, Plus, Users, 
     ArrowUpDown, ArrowUp, ArrowDown, FileText, Menu, X as CloseIcon,
     Stethoscope, Heart, Scissors, Brain, Sparkles, User, FlaskConical, 
-    Bone, HeartPulse, Microscope, Printer, Calendar as CalendarIcon, Settings,
+    Bone, HeartPulse, Microscope, Calendar as CalendarIcon, Settings,
     ChevronDown, Check
 } from "lucide-react";
 import Image from "next/image";
@@ -15,7 +15,7 @@ import LgpdModal from "@/components/LgpdModal";
 import CalendarView from "@/components/CalendarView";
 import ProfileModal from "@/components/ProfileModal";
 import { Patient, PatientStatus, FieldSchema } from "../types";
-import { getPatientsAction as getPatients, updatePatientAction } from "./actions";
+import { getPatientsAction as getPatients, updatePatientAction, recalculateAllPositionsAction } from "./actions";
 import { logLgpdConsentAction } from "./staff-actions";
 import { getSchemaAction } from "./config-actions";
 
@@ -35,7 +35,7 @@ export default function Dashboard() {
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [selectedSistemas, setSelectedSistemas] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<PatientStatus[]>([]);
-    const [utiFilter, setUtiFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos');
+    const [utiFilter] = useState<'Todos' | 'Sim' | 'Não'>('Todos');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'none', direction: 'asc' });
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [userName, setUserName] = useState("");
@@ -49,6 +49,8 @@ export default function Dashboard() {
         'status', 'position', 'teamPosition', 'team', 'sistema', 'name', 'aihDate', 'surgeryDate'
     ]));
     const [columnOrder, setColumnOrder] = useState<string[]>([]);
+    const [isRecalculating, setIsRecalculating] = useState(false);
+    const [showRecalculateConfirm, setShowRecalculateConfirm] = useState(false);
 
     const teamIcons: Record<string, React.ElementType> = {
         "Geral (Todas)": Activity,
@@ -84,7 +86,7 @@ export default function Dashboard() {
             if (savedColumns) {
                 try {
                     setVisibleColumnIds(new Set(JSON.parse(savedColumns)));
-                } catch (e) {
+                } catch {
                     console.error("Failed to parse saved columns");
                 }
             }
@@ -93,7 +95,7 @@ export default function Dashboard() {
             if (savedOrder) {
                 try {
                     setColumnOrder(JSON.parse(savedOrder));
-                } catch (e) {
+                } catch {
                     console.error("Failed to parse saved column order");
                 }
             }
@@ -252,25 +254,26 @@ export default function Dashboard() {
             return matchesSearch && matchesTeam && matchesSistema && matchesStatus && matchesUti;
         });
 
-        // Always prioritize Priority 1, then 2, then 3
+        // Sorting logic: user selected column takes precedence
         result.sort((a, b) => {
-            const prioA = a.priority || '3';
-            const prioB = b.priority || '3';
-            
-            // Force Priority 1 > 2 > 3
-            if (prioA !== prioB) {
-                return String(prioA).localeCompare(String(prioB));
-            }
-            
-            // Secondary sort by sortConfig if active
+            // 1. Primary sort based on sortConfig
             if (sortConfig.key !== 'none') {
                 const key = sortConfig.key as keyof Patient;
                 const aVal = String(a[key] || "");
                 const bVal = String(b[key] || "");
-                return sortConfig.direction === 'asc' 
-                    ? aVal.localeCompare(bVal, undefined, { numeric: true }) 
-                    : bVal.localeCompare(aVal, undefined, { numeric: true });
+                const cmp = aVal.localeCompare(bVal, undefined, { numeric: true });
+                if (cmp !== 0) {
+                    return sortConfig.direction === 'asc' ? cmp : -cmp;
+                }
             }
+
+            // 2. Secondary sort/Tie-breaker: Priority 1 > 2 > 3
+            const prioA = String(a.priority || '3');
+            const prioB = String(b.priority || '3');
+            if (prioA !== prioB) {
+                return prioA.localeCompare(prioB);
+            }
+
             return 0;
         });
 
@@ -429,22 +432,18 @@ export default function Dashboard() {
                             <div className="bg-white p-3 rounded-2xl shadow-lg w-24 h-24 mb-4 relative flex-shrink-0">
                                 <Image 
                                     src="/logo-hsr.jpeg"
-                                    alt="Hospital Santa Rita"
+                                    alt="HSR"
                                     fill
                                     className="object-contain p-1"
                                     priority
-                                    onError={() => {
-                                        console.log("Logo failed to load");
-                                    }}
                                 />
                             </div>
                         </div>
                         <div className="flex items-center justify-between -mt-2">
                             <div>
-                                <h2 className="text-xl font-black text-white tracking-tight">CX ONCO HSR</h2>
+                                <h2 className="text-xl font-black text-white tracking-tight text-center">HSR - SUS</h2>
                                 <div className="flex flex-col mt-1">
-                                    <h3 className="text-[10px] font-black text-[#d4af37] uppercase tracking-widest leading-none">Serviço de Cirurgia Oncológica</h3>
-                                    <h4 className="text-[10px] font-black text-white/70 uppercase tracking-widest">Hospital Santa Rita</h4>
+                                    <h3 className="text-[10px] font-black text-[#d4af37] uppercase tracking-widest leading-none text-center">Gestão de Fila Cirúrgica</h3>
                                 </div>
                             </div>
                         </div>
@@ -542,6 +541,18 @@ export default function Dashboard() {
                 </nav>
                 
                 <div className="p-4 mt-auto border-t border-white/5 space-y-1">
+                    {(userRole === 'Administrador' || userRole === 'Médico Preceptor') && (
+                        <button 
+                            onClick={() => setShowRecalculateConfirm(true)}
+                            disabled={isRecalculating}
+                            className={`w-full flex items-center gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 text-xs py-2 px-3 rounded-lg transition-all ${isRecalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Recalcular todas as posições com base na data AIH"
+                        >
+                            <ArrowUpDown size={14} className={isRecalculating ? "animate-pulse" : ""} />
+                            <span className="font-bold uppercase tracking-wider">{isRecalculating ? "Recalculando..." : "Recalcular Posições"}</span>
+                        </button>
+                    )}
+
                     <button 
                         onClick={() => setIsProfileOpen(true)}
                         className="w-full flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2 px-3 rounded-lg transition-all"
@@ -558,7 +569,7 @@ export default function Dashboard() {
                         className="w-full flex items-center gap-2 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg hover:bg-white/5 transition-all"
                     >
                         <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                        <span className="font-medium">{loading ? "Sincronizando..." : "Sincronizar CSV"}</span>
+                        <span className="font-medium">{loading ? "Sincronizando..." : "Sincronizar Planilha"}</span>
                     </button>
                     
                     <button 
@@ -859,7 +870,7 @@ export default function Dashboard() {
                                             
                                             <div className="mb-2 sm:mb-4">
                                                 <h4 className="text-sm sm:text-base font-bold text-slate-800 leading-tight mb-0.5 sm:mb-1 uppercase">{patient.name}</h4>
-                                                <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prontuário: {patient.medicalRecord}</p>
+                                                <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Data AIH: {renderDate(String(patient.aihDate || '--'))}</p>
                                             </div>
 
                                             <div className="flex flex-col gap-1 sm:gap-2 pt-2 sm:pt-4 border-t border-slate-50">
@@ -871,21 +882,9 @@ export default function Dashboard() {
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipe / Sistema</span>
                                                     <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{patient.team} <span className="text-slate-300 mx-1">•</span> {patient.sistema}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
-                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data AIH</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(String(patient.aihDate || ''))}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
-                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Cirurgia</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{renderDate(String(patient.surgeryDate || ''))}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
-                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Preceptor</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{String(patient.preceptor || '--')}</span>
-                                                </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Residente</span>
-                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right">{String(patient.resident || '--')}</span>
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedimento Proposto</span>
+                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-700 text-right truncate max-w-[150px]">{String(patient.procedimentoProposto || '--')}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -995,6 +994,51 @@ export default function Dashboard() {
                 isOpen={isProfileOpen} 
                 onClose={() => setIsProfileOpen(false)} 
             />
+
+            {/* Recalculate Confirmation Modal */}
+            {showRecalculateConfirm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-blue-950/60 p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center animate-in zoom-in duration-200">
+                        <div className="mx-auto w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4">
+                            <ArrowUpDown size={32} />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">Recalcular Posições?</h3>
+                        <p className="text-sm font-medium text-slate-500 mb-8 lowercase first-letter:uppercase">
+                            Esta ação irá redefinir a posição geral e por equipe de todos os pacientes com base na data da AIH. Deseja continuar?
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setShowRecalculateConfirm(false)}
+                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={async () => {
+                                    setShowRecalculateConfirm(false);
+                                    setIsRecalculating(true);
+                                    try {
+                                        const result = await recalculateAllPositionsAction();
+                                        if (result.success) {
+                                            await fetchData();
+                                        } else {
+                                            alert(result.error || "Erro ao recalcular posições.");
+                                        }
+                                    } catch (err) {
+                                        console.error(err);
+                                        alert("Erro ao recalcular posições.");
+                                    } finally {
+                                        setIsRecalculating(false);
+                                    }
+                                }}
+                                className="flex-1 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-orange-600/20"
+                            >
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -37,6 +37,7 @@ export async function GET() {
             usersFound: response.data.values?.length,
             message: "Conexão com Sheets bem sucedida na Vercel"
         });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
         return NextResponse.json({ 
             status: "ERROR", 

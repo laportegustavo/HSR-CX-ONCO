@@ -5,7 +5,7 @@ import { X, Camera, Loader2, Trash2 } from "lucide-react";
 import { createWorker, PSM } from 'tesseract.js';
 import { toast } from "sonner";
 import { Patient, MedicalStaff, FieldSchema } from "../types";
-import { getStaff } from "../app/staff-actions";
+import { getStaffAction } from "../app/staff-actions";
 import { updatePatientAction, createPatientAction, deletePatientAction } from "../app/actions";
 import { getFieldSchema } from "../app/field-actions";
 
@@ -41,7 +41,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
     useEffect(() => {
         const fetchInitialData = async () => {
             const [staffData, configData, schemaData] = await Promise.all([
-                getStaff(),
+                getStaffAction(),
                 import('../app/config-actions').then(m => m.getConfig()),
                 getFieldSchema()
             ]);
@@ -297,7 +297,7 @@ export default function PatientModal({ patient, isOpen, onClose, onSave }: Patie
             case 'auxiliaryResidents':
                 return staff.filter((s: MedicalStaff) => s.type === 'resident').map((s: MedicalStaff) => s.systemName).sort((a: string, b: string) => a.localeCompare(b));
             case 'status':
-                return ["AGENDADOS", "CIRURGIA REALIZADA", "OBSERVAÇÕES/PENDÊNCIAS", "PERDA DE SEGUIMENTO", "PRONTOS", "SEM STATUS"];
+                return ["AGENDADOS", "CIRURGIA REALIZADA", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PERDA DE SEGUIMENTO", "PRONTOS", "SEM STATUS"];
             case 'priority':
                 return ['1', '2', '3'];
             default: return [];

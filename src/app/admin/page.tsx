@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { 
     Users, UserPlus, Trash2, Save, ArrowLeft, 
     Stethoscope, ShieldCheck, Contact, Plus, UserCircle,
-    Layers, ArrowUp, ArrowDown, Settings2, TrendingUp, Loader2, LayoutDashboard,
-    Cloud, Lock, Database, CheckCircle2
+    Layers, ArrowUp, ArrowDown, TrendingUp, Loader2,
+    Cloud, Lock, Database, CheckCircle2, AlertCircle, X
 } from 'lucide-react';
 import { MedicalStaff, Patient } from '@/types';
-import { getStaff, saveStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
+import { getStaffAction, createStaffAction, updateStaffAction, deleteStaffAction, getAccessLogsAction } from '../staff-actions';
 import { getPatientChangeLogsAction, getPatientsAction, deletePatientAction, recalculateAllPositionsAction } from "../actions";
 import DashboardStats from "@/components/DashboardStats";
 import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSystemAction, updateTeamAction, updateSystemAction, addHospitalAction, deleteHospitalAction, updateHospitalAction } from '../config-actions';
@@ -54,14 +54,20 @@ export default function AdminDashboard() {
     const [teamSortDir, setTeamSortDir] = useState<'asc' | 'desc'>('asc');
     const [systemSortDir, setSystemSortDir] = useState<'asc' | 'desc'>('asc');
     const [hospitalSortDir, setHospitalSortDir] = useState<'asc' | 'desc'>('asc');
-    const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'staff' | 'patient' | 'team' | 'system' | 'hospital' } | null>(null);
+    const [itemToDelete, setItemToDelete] = useState<{ 
+        id: string, 
+        name: string, 
+        type: 'staff' | 'patient' | 'team' | 'system' | 'hospital' | 'recalculate' | 'update_team' | 'update_system' | 'update_hospital',
+        actionValue?: string
+    } | null>(null);
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const router = useRouter();
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const [staffData, configData, patientsData, logsData, changeLogsData] = await Promise.all([
-                getStaff(), 
+                getStaffAction(), 
                 getConfig(),
                 getPatientsAction(), // Changed from getPatients() to getPatientsAction()
                 getAccessLogsAction(),
@@ -127,7 +133,10 @@ export default function AdminDashboard() {
         }
 
         try {
-            const result = await saveStaffAction(editingId ? { ...formData, id: editingId } as MedicalStaff : formData);
+            const result = editingId 
+                ? await updateStaffAction({ ...formData, id: editingId } as MedicalStaff)
+                : await createStaffAction(formData);
+                
             if (result.success) {
                 // Clear form data first
                 setFormData({
@@ -146,13 +155,16 @@ export default function AdminDashboard() {
                 await fetchData();
                 
                 // Notify user
-                alert(editingId ? 'Profissional atualizado com sucesso!' : 'Profissional cadastrado com sucesso!');
+                setMessage({ type: 'success', text: editingId ? 'Profissional atualizado com sucesso!' : 'Profissional cadastrado com sucesso!' });
+                setTimeout(() => setMessage(null), 3000);
             } else {
-                alert(result.error || 'Erro ao salvar profissional.');
+                setMessage({ type: 'error', text: result.error || 'Erro ao salvar profissional.' });
+                setTimeout(() => setMessage(null), 5000);
             }
         } catch (error) {
             console.error('Error saving staff:', error);
-            alert('Erro ao salvar profissional.');
+            setMessage({ type: 'error', text: 'Erro ao salvar profissional.' });
+            setTimeout(() => setMessage(null), 5000);
         }
     };
 
@@ -216,6 +228,7 @@ export default function AdminDashboard() {
 
     const executeDeletion = async () => {
         if (!itemToDelete) return;
+        setIsUpdating(true); // Bloqueia botões
         
         try {
             if (itemToDelete.type === 'staff') {
@@ -228,39 +241,45 @@ export default function AdminDashboard() {
                 await deleteSystemAction(itemToDelete.name);
             } else if (itemToDelete.type === 'hospital') {
                 await deleteHospitalAction(itemToDelete.name);
+            } else if (itemToDelete.type === 'recalculate') {
+                const result = await recalculateAllPositionsAction();
+                if (!result.success) throw new Error("Erro ao recalcular");
+            } else if (itemToDelete.type === 'update_team' && itemToDelete.actionValue) {
+                await updateTeamAction(itemToDelete.id, itemToDelete.actionValue);
+                setEditingTeam(null);
+                setEditValue("");
+                window.location.reload();
+                return;
+            } else if (itemToDelete.type === 'update_system' && itemToDelete.actionValue) {
+                await updateSystemAction(itemToDelete.id, itemToDelete.actionValue);
+                setEditingSystem(null);
+                setEditValue("");
+                window.location.reload();
+                return;
+            } else if (itemToDelete.type === 'update_hospital' && itemToDelete.actionValue) {
+                await updateHospitalAction(itemToDelete.id, itemToDelete.actionValue);
+                setEditingHospital(null);
+                setEditValue("");
+                window.location.reload();
+                return;
             }
+            
             await fetchData();
             setItemToDelete(null);
         } catch (error) {
-            console.error("Erro na exclusão:", error);
-            alert("Erro ao excluir.");
+            console.error("Erro na ação:", error);
+            alert("Erro ao processar solicitação.");
+        } finally {
+            setIsUpdating(false);
         }
     };
 
     const handleUpdateTeam = async (oldName: string) => {
-        console.log('Client: handleUpdateTeam', oldName, '->', editValue);
         if (!editValue || editValue === oldName) {
             setEditingTeam(null);
             return;
         }
-        if (confirm(`Alterar nome da equipe de "${oldName}" para "${editValue}"? Isso atualizará todos os pacientes desta equipe.`)) {
-            setIsUpdating(true);
-            try {
-                console.log('Client: Calling updateTeamAction...');
-                const result = await updateTeamAction(oldName, editValue);
-                console.log('Client: updateTeamAction server result:', result);
-                setEditingTeam(null);
-                setEditValue("");
-                await fetchData();
-                alert("Equipe atualizada com sucesso!");
-                window.location.reload();
-            } catch (error) {
-                console.error("Client: Error updating team:", error);
-                alert("Erro ao atualizar equipe. Verifique os logs.");
-            } finally {
-                setIsUpdating(false);
-            }
-        }
+        setItemToDelete({ id: oldName, name: oldName, type: 'update_team', actionValue: editValue });
     };
 
     const handleUpdateSystem = async (oldName: string) => {
@@ -269,21 +288,7 @@ export default function AdminDashboard() {
             setEditingSystem(null);
             return;
         }
-        if (confirm(`Alterar nome do sistema de "${oldName}" para "${editValue}"? Isso atualizará todos os pacientes deste sistema.`)) {
-            setIsUpdating(true);
-            try {
-                const result = await updateSystemAction(oldName, editValue);
-                setEditingSystem(null);
-                setEditValue("");
-                await fetchData();
-                alert("Sistema atualizado com sucesso!");
-                window.location.reload();
-            } catch (error) {
-                alert("Erro ao atualizar sistema. Verifique os logs.");
-            } finally {
-                setIsUpdating(false);
-            }
-        }
+        setItemToDelete({ id: oldName, name: oldName, type: 'update_system', actionValue: editValue });
     };
 
 
@@ -292,41 +297,11 @@ export default function AdminDashboard() {
             setEditingHospital(null);
             return;
         }
-        if (confirm(`Alterar nome do Local de "${oldName}" para "${editValue}"? Isso atualizará todos os pacientes com este Local.`)) {
-            setIsUpdating(true);
-            try {
-                await updateHospitalAction(oldName, editValue);
-                setEditingHospital(null);
-                setEditValue("");
-                await fetchData();
-                alert("Local atualizado com sucesso!");
-                window.location.reload();
-            } catch (error) {
-                console.error("Error updating hospital:", error);
-                alert("Erro ao atualizar local.");
-            } finally {
-                setIsUpdating(false);
-            }
-        }
+        setItemToDelete({ id: oldName, name: oldName, type: 'update_hospital', actionValue: editValue });
     };
 
     const handleRecalculatePositions = async () => {
-        if (confirm("Isso irá recalcular a Posição Geral e Posição Equipe de TODOS os pacientes com base na Data da AIH. Pacientes mais antigos terão as posições 1, 2, etc. Deseja continuar?")) {
-            setIsUpdating(true);
-            try {
-                const result = await recalculateAllPositionsAction();
-                if (result.success) {
-                    alert(`Posições recalculadas com sucesso!`);
-                } else {
-                    alert("Erro ao recalcular posições.");
-                }
-            } catch (error) {
-                console.error(error);
-                alert("Erro ao recalcular posições.");
-            } finally {
-                setIsUpdating(false);
-            }
-        }
+        setItemToDelete({ id: 'recalc', name: 'TODAS as posições', type: 'recalculate' });
     };
 
     return (
@@ -346,7 +321,7 @@ export default function AdminDashboard() {
                             <div className="bg-white p-1.5 rounded-xl shadow-lg w-10 h-10 sm:w-12 sm:h-12 relative flex-shrink-0">
                                 <Image 
                                     src="/logo-hsr.jpeg"
-                                    alt="Hospital Santa Rita"
+                                    alt="HSR"
                                     fill
                                     className="object-contain p-0.5"
                                     priority
@@ -442,6 +417,16 @@ export default function AdminDashboard() {
                         Estatísticas
                     </button>
                 </div>
+
+                {message && (
+                    <div className={`mb-8 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${
+                        message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                    }`}>
+                        {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+                        <p className="text-xs font-black uppercase tracking-widest">{message.text}</p>
+                        <button onClick={() => setMessage(null)} title="Fechar" className="ml-auto opacity-50 hover:opacity-100"><X size={18} /></button>
+                    </div>
+                )}
 
                 <div className={activeTab === 'settings' ? "flex flex-col gap-8 max-w-4xl mx-auto w-full" : "grid grid-cols-1 lg:grid-cols-3 gap-8"}>
                     {loading ? (
@@ -1018,8 +1003,22 @@ export default function AdminDashboard() {
                                                         <>
                                                             <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{team}</span>
                                                             <div className="flex items-center gap-2">
-                                                                <button onClick={() => { setEditingTeam(team); setEditValue(team); }} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Save size={16} /></button>
-                                                                <button onClick={() => handleDeleteTeam(team)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                                <button 
+                                                                    onClick={() => { setEditingTeam(team); setEditValue(team); }} 
+                                                                    title="Editar Equipe"
+                                                                    aria-label="Editar Equipe"
+                                                                    className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Save size={16} />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteTeam(team)} 
+                                                                    title="Excluir Equipe"
+                                                                    aria-label="Excluir Equipe"
+                                                                    className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
                                                             </div>
                                                         </>
                                                     )}
@@ -1086,8 +1085,22 @@ export default function AdminDashboard() {
                                                         <>
                                                             <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{hospital}</span>
                                                             <div className="flex items-center gap-2">
-                                                                <button onClick={() => { setEditingHospital(hospital); setEditValue(hospital); }} className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><Save size={16} /></button>
-                                                                <button onClick={() => handleDeleteHospital(hospital)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                                <button 
+                                                                    onClick={() => { setEditingHospital(hospital); setEditValue(hospital); }} 
+                                                                    title="Editar Local"
+                                                                    aria-label="Editar Local"
+                                                                    className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Save size={16} />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteHospital(hospital)} 
+                                                                    title="Excluir Local"
+                                                                    aria-label="Excluir Local"
+                                                                    className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
                                                             </div>
                                                         </>
                                                     )}
@@ -1154,8 +1167,22 @@ export default function AdminDashboard() {
                                                         <>
                                                             <span className="text-sm font-bold text-slate-700 tracking-wide uppercase">{system}</span>
                                                             <div className="flex items-center gap-2">
-                                                                <button onClick={() => { setEditingSystem(system); setEditValue(system); }} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><Save size={16} /></button>
-                                                                <button onClick={() => handleDeleteSystem(system)} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                                                <button 
+                                                                    onClick={() => { setEditingSystem(system); setEditValue(system); }} 
+                                                                    title="Editar Sistema"
+                                                                    aria-label="Editar Sistema"
+                                                                    className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Save size={16} />
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => handleDeleteSystem(system)} 
+                                                                    title="Excluir Sistema"
+                                                                    aria-label="Excluir Sistema"
+                                                                    className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
                                                             </div>
                                                         </>
                                                     )}
@@ -1209,26 +1236,45 @@ export default function AdminDashboard() {
             {itemToDelete && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-blue-950/40 p-4">
                     <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-sm w-full text-center">
-                        <div className="mx-auto w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-                            <Trash2 size={32} />
+                        <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                            ['recalculate', 'update_team', 'update_system', 'update_hospital'].includes(itemToDelete.type) 
+                            ? 'bg-blue-100 text-blue-600' 
+                            : 'bg-red-100 text-red-600'
+                        }`}>
+                            {['recalculate', 'update_team', 'update_system', 'update_hospital'].includes(itemToDelete.type) 
+                                ? <Save size={32} /> 
+                                : <Trash2 size={32} />
+                            }
                         </div>
-                        <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">Confirmar Exclusão</h3>
+                        <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">
+                            {['recalculate', 'update_team', 'update_system', 'update_hospital'].includes(itemToDelete.type) ? 'Confirmar Alteração' : 'Confirmar Exclusão'}
+                        </h3>
                         <p className="text-sm font-medium text-slate-500 mb-8">
-                            Tem certeza que deseja excluir permanentemente <b>{itemToDelete.name}</b>?
-                            Esta ação não pode ser desfeita.
+                            {itemToDelete.type === 'recalculate' ? (
+                                <>Isso irá recalcular a Posição Geral e Posição Equipe de <b>TODOS</b> os pacientes com base na Data da AIH. Deseja continuar?</>
+                            ) : ['update_team', 'update_system', 'update_hospital'].includes(itemToDelete.type) ? (
+                                <>Deseja alterar o nome de <b>{itemToDelete.name}</b> para <b>{itemToDelete.actionValue}</b>? Todos os pacientes serão atualizados.</>
+                            ) : (
+                                <>Tem certeza que deseja excluir permanentemente <b>{itemToDelete.name}</b>? Esta ação não pode ser desfeita.</>
+                            )}
                         </p>
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => setItemToDelete(null)}
-                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
+                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button 
                                 onClick={executeDeletion}
-                                className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-colors shadow-lg shadow-red-600/20"
+                                disabled={isUpdating}
+                                className={`flex-1 py-3.5 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg disabled:opacity-50 ${
+                                    ['recalculate', 'update_team', 'update_system', 'update_hospital'].includes(itemToDelete.type)
+                                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
+                                    : 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                                }`}
                             >
-                                Sim, Excluir
+                                {isUpdating ? 'Processando...' : 'Confirmar'}
                             </button>
                         </div>
                     </div>

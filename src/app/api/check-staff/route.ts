@@ -27,6 +27,7 @@ export async function GET() {
                 range: 'Equipe!A2:I'
             });
             rawCount = response.data.values?.length || 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             rawError = e.message;
         }
@@ -38,6 +39,7 @@ export async function GET() {
             raw_error: rawError,
             staff_is_array: Array.isArray(staff)
         });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e.message });
     }

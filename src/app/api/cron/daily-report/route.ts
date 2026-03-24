@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Format Report
-        let reportText = `RESUMO DIÁRIO - CX ONCO HSR\n`;
+        let reportText = `RESUMO DIÁRIO - CIRUFLOW\n`;
         reportText += `Período: ${twentyFourHoursAgo.toLocaleString('pt-BR')} até ${now.toLocaleString('pt-BR')}\n`;
         reportText += `====================================================\n\n`;
 
