@@ -190,7 +190,7 @@ export default function Dashboard() {
 
     const handleLgpdAccept = async () => {
         try {
-            await logLgpdConsentAction(userName);
+            await logLgpdConsentAction();
             localStorage.setItem(`lgpd_accepted_${userName}`, 'true');
             setShowLgpdModal(false);
         } catch (error) {

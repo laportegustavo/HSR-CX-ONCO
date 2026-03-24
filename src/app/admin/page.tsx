@@ -316,7 +316,7 @@ export default function AdminDashboard() {
             try {
                 const result = await recalculateAllPositionsAction();
                 if (result.success) {
-                    alert(`Posições recalculadas com sucesso! ${result?.updated || 0} pacientes afetados.`);
+                    alert(`Posições recalculadas com sucesso!`);
                 } else {
                     alert("Erro ao recalcular posições.");
                 }
