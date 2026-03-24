@@ -492,10 +492,10 @@ export default function Dashboard() {
                                         }
                                     }}
                                     title={`Filtrar por ${team}`}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all active:translate-y-1 ${
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all relative ${
                                         isSelected 
-                                            ? "bg-[#d4af37] text-[#0a1f44] font-black shadow-[0_4px_0_0_#b8962d,0_4px_10px_0_rgba(212,175,55,0.3)] border-t border-white/20" 
-                                            : "text-slate-300 hover:bg-white/5 hover:text-white border border-transparent"
+                                            ? "bg-[#d4af37] text-[#0a1f44] font-black shadow-[0_4px_0_0_#b8962d] border-t border-white/20 active:translate-y-1 active:shadow-none" 
+                                            : "text-slate-300 bg-white/5 border-t border-white/10 shadow-[0_4px_0_0_#051532] hover:bg-white/10 hover:text-white hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#051532] active:translate-y-1 active:shadow-none"
                                     }`}
                                 >
                                     <div className="flex items-center gap-2 truncate">
@@ -547,7 +547,7 @@ export default function Dashboard() {
                         <button 
                             onClick={() => setShowRecalculateConfirm(true)}
                             disabled={isRecalculating}
-                            className={`w-full flex items-center gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 text-xs py-2.5 px-3 rounded-xl transition-all active:translate-y-0.5 border border-orange-500/20 shadow-[0_2px_0_0_rgba(251,146,60,0.1)] ${isRecalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`w-full flex items-center gap-2 text-orange-400 bg-orange-500/5 hover:text-orange-300 hover:bg-orange-500/10 text-xs py-2.5 px-3 rounded-xl transition-all border-t border-white/5 shadow-[0_3px_0_0_#1a1a1a] hover:-translate-y-0.5 hover:shadow-[0_4px_0_0_#1a1a1a] active:translate-y-1 active:shadow-none ${isRecalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Recalcular todas as posições com base na data AIH"
                         >
                             <ArrowUpDown size={14} className={isRecalculating ? "animate-pulse" : ""} />
@@ -557,7 +557,7 @@ export default function Dashboard() {
 
                     <button 
                         onClick={() => setIsProfileOpen(true)}
-                        className="w-full flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2.5 px-3 rounded-xl transition-all active:translate-y-0.5 border border-blue-500/20 shadow-[0_2px_0_0_rgba(96,165,250,0.1)]"
+                        className="w-full flex items-center gap-2 text-blue-400 bg-blue-500/5 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2.5 px-3 rounded-xl transition-all border-t border-white/5 shadow-[0_3px_0_0_#1a1a1a] hover:-translate-y-0.5 hover:shadow-[0_4px_0_0_#1a1a1a] active:translate-y-1 active:shadow-none"
                         title="Configurações de Perfil"
                     >
                         <User size={14} />
@@ -568,7 +568,7 @@ export default function Dashboard() {
                         onClick={fetchData} 
                         aria-label="Sincronizar dados"
                         title="Sincronizar dados"
-                        className="w-full flex items-center gap-2 text-slate-400 hover:text-white text-xs py-2 px-3 rounded-lg hover:bg-white/5 transition-all"
+                        className="w-full flex items-center gap-2 text-slate-400 bg-white/5 hover:text-white text-xs py-2.5 px-3 rounded-xl hover:bg-white/10 transition-all border-t border-white/5 shadow-[0_3px_0_0_#1a1a1a] hover:-translate-y-0.5 hover:shadow-[0_4px_0_0_#1a1a1a] active:translate-y-1 active:shadow-none"
                     >
                         <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                         <span className="font-medium">{loading ? "Sincronizando..." : "Sincronizar Planilha"}</span>
@@ -581,7 +581,7 @@ export default function Dashboard() {
                             document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                             window.location.href = "/login";
                         }}
-                        className="w-full flex items-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs py-2 px-3 rounded-lg transition-all mt-2 active:scale-95 border border-rose-500/20 shadow-[0_2px_0_0_rgba(244,63,94,0.1)]"
+                        className="w-full flex items-center gap-2 text-rose-400 bg-rose-500/5 hover:text-rose-300 hover:bg-rose-500/10 text-xs py-2.5 px-3 rounded-xl transition-all mt-2 border-t border-white/5 shadow-[0_3px_0_0_#1a1a1a] hover:-translate-y-0.5 hover:shadow-[0_4px_0_0_#1a1a1a] active:translate-y-1 active:shadow-none"
                         title="Sair do sistema"
                     >
                         <CloseIcon size={14} className="rotate-45" />
