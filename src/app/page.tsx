@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, DragEvent } from "react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { 
     Search, Activity, RefreshCw, LayoutList, LayoutGrid, Plus, Users, 
     ArrowUpDown, ArrowUp, ArrowDown, FileText, Menu, X as CloseIcon,
@@ -202,33 +203,27 @@ export default function Dashboard() {
         }
     };
 
-    const handleDragStart = (e: React.DragEvent, patientId: string) => {
-        e.dataTransfer.setData("patientId", patientId);
-    };
+    const onDragEnd = async (result: DropResult) => {
+        const { destination, source, draggableId } = result;
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Allow drop
-    };
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    const handleDrop = async (e: React.DragEvent, newStatus: PatientStatus) => {
-        const patientId = e.dataTransfer.getData("patientId");
+        const patientId = draggableId;
+        const newStatus = destination.droppableId as PatientStatus;
         const patient = patients.find(p => p.id === patientId);
-        
+
         if (patient && patient.status !== newStatus) {
             const updatedPatient = { ...patient, status: newStatus };
             // Update local state for immediate feedback
             setPatients(prev => prev.map(p => p.id === patientId ? updatedPatient : p));
-            console.log(`Moved patient ${patientId} to ${newStatus}`);
             
-            // Perist to backend
             try {
                 const res = await updatePatientAction(updatedPatient);
                 if (!res.success) {
-                    console.error("Erro ao salvar o status");
-                    // Reverte se falhar
                     setPatients(prev => prev.map(p => p.id === patientId ? patient : p));
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
                 setPatients(prev => prev.map(p => p.id === patientId ? patient : p));
             }
@@ -902,66 +897,78 @@ export default function Dashboard() {
                              )}
                         </>
                     ) : (
-                        <div className="flex gap-4 sm:gap-6 pb-6 overflow-x-auto no-scrollbar snap-x snap-mandatory lg:snap-none -mx-4 px-4 sm:mx-0 sm:px-0">
-                            {(selectedStatuses.length > 0
-                                ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"].filter(s => selectedStatuses.includes(s as PatientStatus))
-                                : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"]
-                            ).map((status) => {
-                                const colPatients = filteredPatients.filter(p => p.status === status);
-                                return (
-                                <div 
-                                    key={status} 
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, status as PatientStatus)}
-                                    className="w-[280px] sm:w-80 flex-shrink-0 bg-slate-100 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 border-2 border-transparent transition-colors hover:border-blue-200 snap-center"
-                                >
-                                    <div className="flex items-center justify-between px-1">
-                                        <h3 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">{status}</h3>
-                                        <span className="bg-white/50 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-slate-200/50">
-                                            {colPatients.length}
-                                        </span>
-                                    </div>
-                                    <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
-                                        {colPatients.map((p) => (
-                                            <div 
-                                                key={p.id} 
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, p.id)}
-                                                onClick={() => { setSelectedPatient(p); setIsModalOpen(true); }}
-                                                className={`bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-slate-200 cursor-grab active:cursor-grabbing hover:border-blue-400 transition-all hover:shadow-md active:scale-[0.98] group ${
-                                                    String(p.priority || '3') === '1' ? 'border-l-red-500' :
-                                                    String(p.priority || '3') === '2' ? 'border-l-yellow-500' :
-                                                    'border-l-emerald-500'
-                                                }`}
-                                            >
-                                                <p className={`text-xs font-bold mb-1 truncate uppercase ${getPriorityStyle(String(p.priority || '3'))}`}>{p.name}</p>
-                                                <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
-                                                    <span className="truncate max-w-[120px]">{p.team}</span>
-                                                    <span className="font-mono">{p.medicalRecord}</span>
-                                                </div>
-                                                <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-50">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-[8px] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-blue-600 font-black" title="Posição Geral">
-                                                            G: #{String(p.position || '--')}
-                                                        </span>
-                                                        <span className="text-[8px] bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-emerald-600 font-black" title="Posição Equipe">
-                                                            E: #{String(p.teamPosition || '--')}
-                                                        </span>
-                                                        <span className="text-[8px] bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400 font-black uppercase tracking-tighter">
-                                                            {String(p.sistema || '--')}
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <div className="flex gap-4 sm:gap-6 pb-6 overflow-x-auto no-scrollbar snap-x snap-mandatory lg:snap-none -mx-4 px-4 sm:mx-0 sm:px-0">
+                                {(selectedStatuses.length > 0
+                                    ? ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"].filter(s => selectedStatuses.includes(s as PatientStatus))
+                                    : ["SEM STATUS", "AGENDADOS", "OBSERVAÇÕES/PENDÊNCIAS", "DISCUTIR EM ROUND", "PRONTOS", "CIRURGIA REALIZADA", "PERDA DE SEGUIMENTO"]
+                                ).map((status) => {
+                                    const colPatients = filteredPatients.filter(p => p.status === status);
+                                    return (
+                                        <Droppable key={status} droppableId={status}>
+                                            {(provided) => (
+                                                <div 
+                                                    {...provided.droppableProps}
+                                                    ref={provided.innerRef}
+                                                    className="w-[280px] sm:w-80 flex-shrink-0 bg-slate-100 rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 border-2 border-transparent transition-colors hover:border-blue-200 snap-center"
+                                                >
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <h3 className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">{status}</h3>
+                                                        <span className="bg-white/50 text-slate-600 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-slate-200/50">
+                                                            {colPatients.length}
                                                         </span>
                                                     </div>
-                                                    {p.examPdfPath && (
-                                                        <FileText size={12} className="text-blue-500" />
-                                                    )}
+                                                    <div className="flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar min-h-[150px]">
+                                                        {colPatients.map((p, index) => (
+                                                            <Draggable key={p.id} draggableId={p.id} index={index}>
+                                                                {(provided, snapshot) => (
+                                                                    <div 
+                                                                        ref={provided.innerRef}
+                                                                        {...provided.draggableProps}
+                                                                        {...provided.dragHandleProps}
+                                                                        onClick={() => { setSelectedPatient(p); setIsModalOpen(true); }}
+                                                                        className={`bg-white p-4 rounded-xl shadow-sm border-l-4 border-y border-r border-slate-200 cursor-grab active:cursor-grabbing hover:border-blue-400 transition-all hover:shadow-md active:scale-[0.98] group ${
+                                                                            snapshot.isDragging ? 'rotate-2 scale-105 shadow-2xl z-50' : ''
+                                                                        } ${
+                                                                            String(p.priority || '3') === '1' ? 'border-l-red-500' :
+                                                                            String(p.priority || '3') === '2' ? 'border-l-yellow-500' :
+                                                                            'border-l-emerald-500'
+                                                                        }`}
+                                                                    >
+                                                                        <p className={`text-xs font-bold mb-1 truncate uppercase ${getPriorityStyle(String(p.priority || '3'))}`}>{p.name}</p>
+                                                                        <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
+                                                                            <span className="truncate max-w-[120px]">{p.team}</span>
+                                                                            <span className="font-mono">{p.medicalRecord || '--'}</span>
+                                                                        </div>
+                                                                        <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-50">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-[8px] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-blue-600 font-black" title="Posição Geral">
+                                                                                    G: #{String(p.position || '--')}
+                                                                                </span>
+                                                                                <span className="text-[8px] bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-emerald-600 font-black" title="Posição Equipe">
+                                                                                    E: #{String(p.teamPosition || '--')}
+                                                                                </span>
+                                                                                <span className="text-[8px] bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400 font-black uppercase tracking-tighter">
+                                                                                    {String(p.sistema || '--')}
+                                                                                </span>
+                                                                            </div>
+                                                                            {p.examPdfPath && (
+                                                                                <FileText size={12} className="text-blue-500" />
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </Draggable>
+                                                        ))}
+                                                        {provided.placeholder}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                );
-                            })}
-                        </div>
+                                            )}
+                                        </Droppable>
+                                    );
+                                })}
+                            </div>
+                        </DragDropContext>
                     )}
                 </main>
                 
