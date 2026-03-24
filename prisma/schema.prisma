@@ -1,0 +1,166 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ----------------------------------------------------------------------
+// ENUMS
+// ----------------------------------------------------------------------
+enum PlanType {
+  FREE
+  TRIAL
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum Role {
+  ADMIN
+  PRECEPTOR
+  RESIDENT
+}
+
+enum PatientPriority {
+  P1
+  P2
+  P3
+}
+
+// ----------------------------------------------------------------------
+// TENANT & TEAMS
+// ----------------------------------------------------------------------
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique @default("hsr")
+  subscription PlanType @default(FREE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users        User[]
+  patients     Patient[]
+  teams        Team[]
+  logs         AccessLog[]
+  config       TenantConfig?
+}
+
+model TenantConfig {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  systems   String[] // Lista de sistemas (ex: Cliniguard, Tasy)
+  hospitals String[] // Lista de hospitais
+  
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  patients    Patient[]
+}
+
+// ----------------------------------------------------------------------
+// USERS (Auth)
+// ----------------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  fullName     String
+  systemName   String?
+  crm          String?
+  phone        String?
+  role         Role     @default(RESIDENT)
+  isActive     Boolean  @default(true)
+  lgpdAccepted Boolean  @default(false)
+  isSuperAdmin Boolean? @default(false)
+
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------------
+// PATIENTS
+// ----------------------------------------------------------------------
+model Patient {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Core identifiers
+  fullName           String
+  birthDate          String?
+  age                String?
+  cpf                String?
+  city               String?
+  contactPhone       String?
+  medicalRecord      String?          // Prontuário
+
+  // Clinical path
+  aihDate            String?          // Data da AIH
+  status             String           @default("AGUARDANDO AVALIAÇÃO")
+  priority           String           @default("3") // "1", "2", "3" (or P3 mapping)
+  clinicalData       String?          @db.Text
+  caseDiscussion     String?          @db.Text
+  preAnestheticEval  String?          @db.Text
+  observations       String?          @db.Text
+  
+  // Needs
+  needsICU           Boolean          @default(false)
+  latexAllergy       Boolean          @default(false)
+  jehovahsWitness    Boolean          @default(false)
+
+  // Surgery execution
+  surgeryDate        String?
+  hospitalLocation   String?
+  operatingRoom      String?
+  surgeryTime        String?
+
+  // Medical Team relation
+  teamId             String?
+  team               Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  preceptorName      String?
+  mainResidentName   String?
+  auxiliaryResidents String?          // Pode ser normalizado para String array, mas manteremos simple text by now
+  
+  // Attachments & Metadata
+  examPdfPath        String?
+  waitTimeDays       Int?             @default(0) // Replacing the dynamic waitTime
+  position           Int?             @default(0) // DB-cached sequence
+  teamPosition       Int?             @default(0) // DB-cached team sequence
+  
+  lastUpdatedBy      String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model AccessLog {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  user        String   // Nome ou username do autor
+  patientId   String?
+  patientName String?
+  action      String?
+  field       String?
+  oldValue    String?
+  newValue    String?
+  
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}

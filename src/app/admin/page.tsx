@@ -16,7 +16,7 @@ import { getConfig, addTeamAction, deleteTeamAction, addSystemAction, deleteSyst
 import PatientModal from '@/components/PatientModal';
 import FieldManager from '@/components/FieldManager';
 import Image from 'next/image';
-import { exportPatientsToExcel, downloadBackupAsJson } from '@/utils/export-utils';
+import { exportPatientsToExcel, downloadBackupAsJson, downloadBackupAsExcel } from '@/utils/export-utils';
 
 export default function AdminDashboard() {
     const [staff, setStaff] = useState<MedicalStaff[]>([]);
@@ -311,7 +311,7 @@ export default function AdminDashboard() {
     };
 
     const handleRecalculatePositions = async () => {
-        if (confirm("Isso irá recalcular a Posição de TODOS os pacientes com base na Data da AIH. Pacientes mais antigos terão as posições 1, 2, etc. Deseja continuar?")) {
+        if (confirm("Isso irá recalcular a Posição Geral e Posição Equipe de TODOS os pacientes com base na Data da AIH. Pacientes mais antigos terão as posições 1, 2, etc. Deseja continuar?")) {
             setIsUpdating(true);
             try {
                 const result = await recalculateAllPositionsAction();
@@ -455,7 +455,7 @@ export default function AdminDashboard() {
                         <>
                             {activeTab === 'stats' ? (
                                 <div className="lg:col-span-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <DashboardStats patients={patients} />
+                                    <DashboardStats patients={patients} activeTeams={config.teams} />
                                 </div>
                             ) : activeTab === 'staff' ? (
                                 <>
@@ -930,7 +930,7 @@ export default function AdminDashboard() {
                                                         </div>
                                                         <h3 className="text-xl font-black text-white tracking-tight">Cloud Backup (Snapshot)</h3>
                                                     </div>
-                                                    <p className="text-sm text-slate-400 font-medium max-w-md">Gere um arquivo JSON com 100% dos dados para segurança redundante ou migrações.</p>
+                                                    <p className="text-sm text-slate-400 font-medium max-w-md">Gere um arquivo com 100% dos dados para segurança redundante ou migrações.</p>
                                                     
                                                     <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2 bg-white/5 p-3 rounded-2xl border border-white/5 inline-flex w-fit">
                                                         <span className="flex items-center gap-1.5"><Database size={12} /> {patients.length} Pacientes</span>
@@ -939,13 +939,22 @@ export default function AdminDashboard() {
                                                     </div>
                                                 </div>
                                                 
-                                                <button 
-                                                    onClick={() => downloadBackupAsJson(patients)}
-                                                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3 group/btn whitespace-nowrap"
-                                                >
-                                                    <Save size={20} className="group-hover/btn:rotate-12 transition-transform" />
-                                                    Gerar Backup Agora
-                                                </button>
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    <button 
+                                                        onClick={() => downloadBackupAsJson(patients)}
+                                                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-6 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 group/btn whitespace-nowrap"
+                                                    >
+                                                        <Save size={20} className="group-hover/btn:rotate-12 transition-transform" />
+                                                        Backup JSON
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => downloadBackupAsExcel(patients)}
+                                                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 transition-all active:scale-95 flex items-center justify-center gap-3 group/btn whitespace-nowrap"
+                                                    >
+                                                        <Save size={20} className="group-hover/btn:rotate-12 transition-transform" />
+                                                        Backup Excel (.xls)
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1167,8 +1176,8 @@ export default function AdminDashboard() {
                                         <div className="flex flex-col gap-4">
                                             <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4">
                                                 <div>
-                                                    <h3 className="font-bold text-slate-800 text-sm">Recalcular Posições (AIH)</h3>
-                                                    <p className="text-xs text-slate-500 mt-1">Reordena o campo "Posição" de todos os pacientes ativos baseado na ordem cronológica da Data da AIH.</p>
+                                                    <h3 className="font-bold text-slate-800 text-sm">Recalcular Posições (Geral e Equipe)</h3>
+                                                    <p className="text-xs text-slate-500 mt-1">Reordena as Posições (Geral e Equipe) de todos os pacientes ativos baseado na ordem cronológica da Data da AIH.</p>
                                                 </div>
                                                 <button
                                                     onClick={handleRecalculatePositions}

@@ -46,7 +46,7 @@ export default function Dashboard() {
     const [schema, setSchema] = useState<FieldSchema[]>([]);
     const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
     const [visibleColumnIds, setVisibleColumnIds] = useState<Set<string>>(new Set([
-        'status', 'position', 'team', 'sistema', 'name', 'aihDate', 'surgeryDate'
+        'status', 'position', 'teamPosition', 'team', 'sistema', 'name', 'aihDate', 'surgeryDate'
     ]));
     const [columnOrder, setColumnOrder] = useState<string[]>([]);
 
@@ -268,8 +268,8 @@ export default function Dashboard() {
                 const aVal = String(a[key] || "");
                 const bVal = String(b[key] || "");
                 return sortConfig.direction === 'asc' 
-                    ? aVal.localeCompare(bVal) 
-                    : bVal.localeCompare(aVal);
+                    ? aVal.localeCompare(bVal, undefined, { numeric: true }) 
+                    : bVal.localeCompare(aVal, undefined, { numeric: true });
             }
             return 0;
         });
@@ -331,7 +331,7 @@ export default function Dashboard() {
     switch(priority) {
         case '1': return 'bg-red-100/80 hover:bg-red-200/80 text-black';
         case '2': return 'bg-yellow-100/80 hover:bg-yellow-200/80 text-black';
-        case '3': return 'bg-green-100/80 hover:bg-green-200/80 text-black';
+        case '3': return 'bg-white hover:bg-slate-50 text-slate-700';
         default: return 'bg-white hover:bg-slate-50 text-slate-700';
     }
 };
@@ -360,6 +360,12 @@ export default function Dashboard() {
         if (field.id === 'position') {
             return (
                 <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">{String(value || '--')}</span>
+            );
+        }
+
+        if (field.id === 'teamPosition') {
+            return (
+                <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">{String(value || '--')}</span>
             );
         }
 
@@ -858,8 +864,8 @@ export default function Dashboard() {
 
                                             <div className="flex flex-col gap-1 sm:gap-2 pt-2 sm:pt-4 border-t border-slate-50">
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
-                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Posição</span>
-                                                    <span className="text-[10px] sm:text-xs font-black text-blue-600">{String(patient.position || '--')}</span>
+                                                    <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Posição GERAL / EQUIPE</span>
+                                                    <span className="text-[10px] sm:text-xs"><span className="font-black text-blue-600 mr-1.5" title="Posição Geral">#{String(patient.position || '--')}</span><span className="font-black text-emerald-600" title="Posição Equipe">#{String(patient.teamPosition || '--')}</span></span>
                                                 </div>
                                                 <div className="flex justify-between items-center border-b border-slate-50 pb-1 sm:pb-2">
                                                     <span className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipe / Sistema</span>
@@ -933,9 +939,12 @@ export default function Dashboard() {
                                                     <span className="font-mono">{p.medicalRecord}</span>
                                                 </div>
                                                 <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-50">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[8px] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded text-blue-600 font-black">
-                                                            #{String(p.position || '--')}
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-[8px] bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded text-blue-600 font-black" title="Posição Geral">
+                                                            G: #{String(p.position || '--')}
+                                                        </span>
+                                                        <span className="text-[8px] bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded text-emerald-600 font-black" title="Posição Equipe">
+                                                            E: #{String(p.teamPosition || '--')}
                                                         </span>
                                                         <span className="text-[8px] bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400 font-black uppercase tracking-tighter">
                                                             {String(p.sistema || '--')}

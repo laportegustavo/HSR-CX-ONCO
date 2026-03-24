@@ -8,19 +8,23 @@ import {
 import { Patient } from '@/types';
 import { DateTime } from 'luxon';
 
-interface DashboardStatsProps {
+export interface DashboardStatsProps {
     patients: Patient[];
+    activeTeams?: string[];
 }
 
-export default function DashboardStats({ patients }: DashboardStatsProps) {
+export default function DashboardStats({ patients, activeTeams }: DashboardStatsProps) {
     const [selectedTeam, setSelectedTeam] = useState<string>("Todas");
     const [selectedSystem, setSelectedSystem] = useState<string>("Todos");
 
     const teams = useMemo(() => {
+        if (activeTeams && activeTeams.length > 0) {
+            return ["Todas", ...[...activeTeams].sort()];
+        }
         const t = new Set<string>();
         patients.forEach(p => { if (p.team && p.team !== '--') t.add(String(p.team)); });
         return ["Todas", ...Array.from(t).sort()];
-    }, [patients]);
+    }, [patients, activeTeams]);
 
     const systems = useMemo(() => {
         const s = new Set<string>();
@@ -46,7 +50,12 @@ export default function DashboardStats({ patients }: DashboardStatsProps) {
         // 2. Team Distribution
         const teamMap: Record<string, number> = {};
         patients.forEach(p => {
-            const team = String(p.team || 'N/A');
+            const team = String(p.team || 'N/A').trim();
+            if (activeTeams && activeTeams.length > 0) {
+                if (!activeTeams.includes(team)) return; // Exclude non-active teams
+            } else {
+                if (team === 'N/A' || team.length > 25) return;
+            }
             teamMap[team] = (teamMap[team] || 0) + 1;
         });
         const teamData = Object.entries(teamMap)
@@ -81,8 +90,16 @@ export default function DashboardStats({ patients }: DashboardStatsProps) {
         const waitTimes: number[] = [];
 
         filtered.forEach(p => {
+            // First priority: pre-calculated field from DB/migration
+            if (typeof p.waitTimeDays === 'number' && p.waitTimeDays > 0) {
+                waitTimes.push(p.waitTimeDays);
+                return;
+            }
+
+            // Second priority: dynamic calculation if dates are present
             const start = parseDate(String(p.aihDate || ''));
             const hasSurgery = p.surgeryDate && String(p.surgeryDate).trim() !== '' && String(p.surgeryDate) !== '--';
+            
             if (start && start.isValid && hasSurgery) {
                 const end = parseDate(String(p.surgeryDate));
                 
@@ -98,7 +115,7 @@ export default function DashboardStats({ patients }: DashboardStatsProps) {
             : 0;
 
         return { statusData, teamData, avgWait, waitCount: waitTimes.length };
-    }, [patients, selectedTeam, selectedSystem]);
+    }, [patients, selectedTeam, selectedSystem, activeTeams]);
 
     const COLORS = ['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#64748b', '#78350f'];
 

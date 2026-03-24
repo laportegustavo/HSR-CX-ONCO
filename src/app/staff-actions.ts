@@ -1,70 +1,122 @@
 'use server';
 
 import { MedicalStaff } from '../types';
-import { getStaffFromSheet, saveStaffToSheet, logAccess, getAccessLogs } from '../lib/google-sheets';
+import prisma from '@/lib/prisma';
+import { logAccess } from '../lib/google-sheets';
 import { cookies } from 'next/headers';
 import nodemailer from 'nodemailer';
+import { getAccessLogs } from '../lib/audit-log';
+
+// Helper to get HSR Tenant
+async function getHSRTenantId() {
+    const tenant = await prisma.tenant.findFirst({
+        where: { name: "HSR - SUS CX ONCO" }
+    });
+    return tenant?.id;
+}
 
 export async function getStaff(): Promise<MedicalStaff[]> {
-    return await getStaffFromSheet();
+    const users = await prisma.user.findMany({
+        orderBy: { fullName: 'asc' }
+    });
+
+    return users.map(u => ({
+        id: u.id,
+        username: u.username,
+        fullName: u.fullName,
+        email: u.email || '',
+        password: u.passwordHash, // Legado: chamamos de password no MedicalStaff
+        type: u.role.toLowerCase(), // admin, preceptor, resident
+        crm: u.crm || '',
+        phone: u.phone || '',
+        systemName: u.systemName || u.fullName
+    })) as MedicalStaff[];
 }
 
 export async function saveStaffAction(staffMember: MedicalStaff | Omit<MedicalStaff, 'id'>) {
     try {
-        const staff = await getStaff();
-        let updatedStaff: MedicalStaff[];
-        
+        const tenantId = await getHSRTenantId();
+        if (!tenantId) throw new Error("Tenant não encontrado");
+
+        const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
+            'admin': 'ADMIN',
+            'preceptor': 'PRECEPTOR',
+            'resident': 'RESIDENT'
+        };
+
+        const data = {
+            username: staffMember.username || `user_${Math.random().toString(36).substring(7)}`,
+            fullName: staffMember.fullName,
+            email: staffMember.email || `${staffMember.username || 'user'}@hsr-onco.com`,
+            passwordHash: staffMember.password || "123456",
+            role: roleMap[staffMember.type] || 'RESIDENT',
+            crm: staffMember.crm || "",
+            phone: staffMember.phone || "",
+            systemName: staffMember.systemName || staffMember.fullName,
+            tenantId,
+            lgpdAccepted: true
+        };
+
         if ('id' in staffMember && staffMember.id) {
-            // Update existing
-            updatedStaff = staff.map(s => s.id === staffMember.id ? staffMember as MedicalStaff : s);
+            await prisma.user.update({
+                where: { id: staffMember.id },
+                data
+            });
         } else {
-            // Create new
-            const newStaff: MedicalStaff = {
-                ...staffMember,
-                id: Math.random().toString(36).substring(2, 9)
-            };
-            updatedStaff = [...staff, newStaff];
+            await prisma.user.create({
+                data
+            });
         }
         
-        await saveStaffToSheet(updatedStaff);
         return { success: true };
     } catch (error) {
-        console.error('Error saving staff to Google Sheets:', error);
+        console.error('Error saving staff to PostgreSQL:', error);
         return { success: false, error: 'Erro ao salvar profissional' };
     }
 }
 
 export async function deleteStaffAction(id: string) {
     try {
-        const staff = await getStaff();
-        const updatedStaff = staff.filter(s => s.id !== id);
-        await saveStaffToSheet(updatedStaff);
+        await prisma.user.delete({
+            where: { id }
+        });
         return { success: true };
     } catch (error) {
-        console.error('Error deleting staff from Google Sheets:', error);
+        console.error('Error deleting staff from PostgreSQL:', error);
         return { success: false, error: 'Erro ao excluir profissional' };
     }
 }
 
 export async function validateLoginAction(username: string, password: string, role: string) {
-    const staff = await getStaff();
-    
     // Role mapping from Login UI to storage type
-    const roleMap: Record<string, string> = {
-        'Administrador': 'admin',
-        'Médico Preceptor': 'preceptor',
-        'Médico Residente': 'resident'
+    const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
+        'Administrador': 'ADMIN',
+        'Médico Preceptor': 'PRECEPTOR',
+        'Médico Residente': 'RESIDENT'
     };
     
     const targetRole = roleMap[role];
     
-    const user = staff.find(s => 
-        (s.username === username || s.email === username) && 
-        s.password === password && 
-        s.type === targetRole
-    );
+    const user = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { username: username },
+                { email: username }
+            ],
+            passwordHash: password, // Note: No MD5/Bcrypt yet as requested to keep legacy compat
+            role: targetRole
+        }
+    });
     
     if (user) {
+        const cookieStore = await cookies();
+        cookieStore.set('userId', user.id, { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('auth', 'true', { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('username', encodeURIComponent(user.fullName), { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('role', role, { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('tenantId', user.tenantId, { path: '/', maxAge: 60 * 60 * 24 });
+        cookieStore.set('isSuperAdmin', String(!!user.isSuperAdmin), { path: '/', maxAge: 60 * 60 * 24 });
+
         logAccess(user.systemName || user.fullName, role).catch(console.error);
         return { success: true, user: { id: user.id, fullName: user.fullName, role: role } };
     }
@@ -73,20 +125,23 @@ export async function validateLoginAction(username: string, password: string, ro
 }
 
 export async function recoverPasswordAction(username: string, role: string) {
-    const staff = await getStaff();
-    
-    const roleMap: Record<string, string> = {
-        'Administrador': 'admin',
-        'Médico Preceptor': 'preceptor',
-        'Médico Residente': 'resident'
+    const roleMap: Record<string, 'ADMIN' | 'PRECEPTOR' | 'RESIDENT'> = {
+        'Administrador': 'ADMIN',
+        'Médico Preceptor': 'PRECEPTOR',
+        'Médico Residente': 'RESIDENT'
     };
     
     const targetRole = roleMap[role];
     
-    const user = staff.find(s => 
-        (s.username === username || s.email === username) && 
-        s.type === targetRole
-    );
+    const user = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { username: username },
+                { email: username }
+            ],
+            role: targetRole
+        }
+    });
     
     if (!user) {
         return { success: false, error: 'Usuário não encontrado' };
@@ -95,20 +150,19 @@ export async function recoverPasswordAction(username: string, role: string) {
     let targetEmail = user.email;
     let isAdminFallback = false;
     
-    if (!targetEmail || targetEmail.trim() === '') {
-        // Sem email cadastrado -> enviar para o administrador
+    if (!targetEmail || targetEmail.trim() === '' || targetEmail.includes('@hsr-onco.com')) {
+        // Sem email real cadastrado -> enviar para o administrador
         targetEmail = 'laportegustavo@gmail.com'; 
         isAdminFallback = true;
     }
 
-    const registeredPassword = user.password;
+    const registeredPassword = user.passwordHash;
     if (!registeredPassword) {
         return { success: false, error: 'O usuário não possui uma senha registrada no sistema.' };
     }
     
-    // Check if Email credentials exist
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        return { success: false, error: 'Envio de e-mail não configurado. Adicione EMAIL_USER e EMAIL_PASS no .env' };
+        return { success: false, error: 'Envio de e-mail não configurado.' };
     }
 
     try {
@@ -127,63 +181,57 @@ export async function recoverPasswordAction(username: string, role: string) {
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; text-align: center; border: 1px solid #e5e7eb; border-radius: 12px;">
                     <h1 style="color: #0a1f44; margin-bottom: 30px;">Recuperação de Senha</h1>
-                    ${isAdminFallback 
-                        ? `<p style="color: #e11d48; font-weight: bold; font-size: 16px;">AVISO ADMINISTRADOR: O usuário ${user.fullName} (${user.username}) solicitou recuperação de senha, mas não possui e-mail cadastrado.</p>
-                           <p style="font-size: 16px; color: #333;">A senha utilizada pelo usuário constante no painel é:</p>`
-                        : `<p style="font-size: 16px; color: #333;">Sua senha atual para acessar o sistema CX ONCO HSR é:</p>`
-                    }
+                    <p style="font-size: 16px; color: #333;">Sua senha atual para acessar o sistema CX ONCO HSR é:</p>
                     <div style="background-color: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
                         <span style="font-size: 24px; font-weight: bold; color: #d4af37;">${registeredPassword}</span>
                     </div>
-                    <p style="font-size: 14px; color: #666; margin-top: 30px;">Se você não solicitou esta recuperação, preste atenção à sua conta.</p>
                 </div>
             `
         };
 
         await transporter.sendMail(mailOptions);
-        
-        return { 
-            success: true, 
-            message: isAdminFallback 
-                ? 'Sem e-mail cadastrado. A senha foi enviada para o Administrador.' 
-                : `Sua senha foi enviada para o e-mail: ${targetEmail.replace(/(.{3}).*(@.*)/, '$1***$2')}`
-        };
+        return { success: true, message: `Sua senha foi enviada para o e-mail: ${targetEmail.replace(/(.{3}).*(@.*)/, '$1***$2')}` };
     } catch (e) {
         console.error("Email send error:", e);
-        return { success: false, error: 'Erro ao enviar o e-mail. Verifique os logs do servidor SMTP.' };
-    }
-}
-
-export async function getAccessLogsAction(): Promise<{ timestamp: string, username: string, role: string }[]> {
-    return await getAccessLogs();
-}
-
-export async function logLgpdConsentAction(username: string) {
-    try {
-        await logAccess(username, 'ACEITE LGPD');
-        return { success: true };
-    } catch (error) {
-        console.error('Error logging LGPD consent:', error);
-        return { success: false, error: 'Erro ao registrar aceite da LGPD' };
+        return { success: false, error: 'Erro ao enviar o e-mail.' };
     }
 }
 
 export async function getMeAction() {
     try {
         const cookieStore = await cookies();
-        const username = cookieStore.get('username')?.value;
+        const username = (await cookieStore).get('username')?.value;
         if (!username) return { success: false, error: 'Não autenticado' };
 
-        const staff = await getStaff();
-        const user = staff.find(s => s.username === decodeURIComponent(username) || s.email === decodeURIComponent(username));
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: decodeURIComponent(username) },
+                    { email: decodeURIComponent(username) }
+                ]
+            }
+        });
         
         if (!user) return { success: false, error: 'Usuário não encontrado' };
         
-        return { success: true, user: { ...user, password: '' } }; // Send empty password for safety, but we'll need it for comparison if they want to see it? Actually user wants to edit it.
+        return { 
+            success: true, 
+            user: { 
+                id: user.id,
+                username: user.username,
+                fullName: user.fullName,
+                email: user.email,
+                type: user.role.toLowerCase(),
+                crm: user.crm,
+                phone: user.phone,
+                systemName: user.systemName
+            } 
+        };
     } catch (error) {
         return { success: false, error: 'Erro ao buscar perfil' };
     }
 }
+
 
 export async function updateSelfAction(userData: Partial<MedicalStaff>) {
     try {
@@ -191,31 +239,37 @@ export async function updateSelfAction(userData: Partial<MedicalStaff>) {
         const username = cookieStore.get('username')?.value;
         if (!username) return { success: false, error: 'Não autenticado' };
 
-        const staff = await getStaff();
         const currentUsername = decodeURIComponent(username);
-        const userIdx = staff.findIndex(s => s.username === currentUsername || s.email === currentUsername);
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: currentUsername },
+                    { email: currentUsername }
+                ]
+            }
+        });
         
-        if (userIdx === -1) return { success: false, error: 'Usuário não encontrado' };
+        if (!user) return { success: false, error: 'Usuário não encontrado' };
 
-        // Keep sensitive fields if not provided
-        const updatedUser = {
-            ...staff[userIdx],
-            ...userData,
-            id: staff[userIdx].id, // Cannot change ID
-            type: staff[userIdx].type // Cannot change own role usually
-        };
+        const data: any = {};
+        if (userData.fullName) data.fullName = userData.fullName;
+        if (userData.email) data.email = userData.email;
+        if (userData.password) data.passwordHash = userData.password;
+        if (userData.crm) data.crm = userData.crm;
+        if (userData.phone) data.phone = userData.phone;
+        if (userData.systemName) data.systemName = userData.systemName;
 
-        const updatedStaff = [...staff];
-        updatedStaff[userIdx] = updatedUser;
-        
-        await saveStaffToSheet(updatedStaff);
+        await prisma.user.update({
+            where: { id: user.id },
+            data
+        });
         
         let logMessage = `ATUALIZOU PRÓPRIO PERFIL`;
         if (userData.password) {
             logMessage += ` | NOVA SENHA: ${userData.password}`;
         }
         
-        await logAccess(updatedUser.systemName || updatedUser.fullName, logMessage).catch(console.error);
+        await logAccess(user.systemName || user.fullName, logMessage).catch(console.error);
 
         return { success: true };
     } catch (error) {
@@ -224,3 +278,37 @@ export async function updateSelfAction(userData: Partial<MedicalStaff>) {
     }
 }
 
+export async function getAccessLogsAction() {
+    return await getAccessLogs();
+}
+
+export async function logLgpdConsentAction() {
+    try {
+        const cookieStore = await cookies();
+        const username = cookieStore.get('username')?.value;
+        if (!username) return { success: false };
+
+        const currentUsername = decodeURIComponent(username);
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username: currentUsername },
+                    { email: currentUsername }
+                ]
+            }
+        });
+
+        if (user) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { lgpdAccepted: true }
+            });
+            await logAccess(user.username, 'ACEITOU LGPD').catch(console.error);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error('Error logLgpdConsentAction:', e);
+        return { success: false };
+    }
+}

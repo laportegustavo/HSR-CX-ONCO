@@ -1,73 +1,86 @@
 'use server';
 
-import { getPatientsFromSheet, savePatientsToSheet, logAccess, getFieldSchema } from '../lib/google-sheets';
+import prisma from '@/lib/prisma';
+import { logAccess, getFieldSchema } from '../lib/google-sheets';
 import { logPatientChange, logPatientAction, getPatientChangeLogs } from '../lib/audit-log';
 import { Patient } from '../types';
 import { cookies } from 'next/headers';
 
+// Helper to get HSR Tenant
+async function getHSRTenantId() {
+    const tenant = await prisma.tenant.findFirst({
+        where: { name: "HSR - SUS CX ONCO" }
+    });
+    return tenant?.id;
+}
+
 /**
  * Recalculates the `position` field for all patients based on their AIH date.
- * Patients with the earliest AIH date receive position 1.
- * Patients without an AIH date are placed at the end without a position number.
  */
-function recalculatePositions(patients: Patient[]): Patient[] {
+async function syncPositionsInDB(tenantId: string) {
+    const patients = await prisma.patient.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'asc' }
+    });
+
     const parseDateBR = (dateStr: string): number => {
-        if (!dateStr) return 0;
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-            const [d, m, y] = parts;
-            return new Date(`${y}-${m}-${d}T00:00:00`).getTime();
+        if (!dateStr || dateStr === '--') return 0;
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length >= 3) {
+                const [y, m, d] = parts;
+                return new Date(`${y}-${m}-${d.substring(0, 2)}T00:00:00`).getTime();
+            }
+        } else if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const [d, m, y] = parts;
+                return new Date(`${y}-${m}-${d}T00:00:00`).getTime();
+            }
         }
         return 0;
     };
 
-    const withDate = patients
-        .filter(p => p.aihDate && String(p.aihDate).trim() !== '')
-        .sort((a, b) => {
-            const timeA = parseDateBR(String(a.aihDate || ''));
-            const timeB = parseDateBR(String(b.aihDate || ''));
-            
-            // 1. Prioridade: Data da AIH (Mais antiga primeiro)
-            if (timeA !== timeB) return timeA - timeB;
+    const sorted = [...patients].sort((a, b) => {
+        const timeA = parseDateBR(a.aihDate || '');
+        const timeB = parseDateBR(b.aihDate || '');
+        
+        if (timeA === 0 && timeB !== 0) return 1;
+        if (timeA !== 0 && timeB === 0) return -1;
+        if (timeA !== timeB) return timeA - timeB;
 
-            // 2. Prioridade: Hora de registro (Mais antigo primeiro)
-            const idA = parseInt(a.id.substring(0, 13));
-            const idB = parseInt(b.id.substring(0, 13));
-            if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {
-                return idA - idB;
-            }
+        return a.createdAt.getTime() - b.createdAt.getTime();
+    });
 
-            // 3. Prioridade: Idade/Mais velho (Data de nascimento mais antiga primeiro)
-            const birthTimeA = parseDateBR(String(a.birthDate || ''));
-            const birthTimeB = parseDateBR(String(b.birthDate || ''));
-            if (birthTimeA && birthTimeB && birthTimeA !== birthTimeB) {
-                return birthTimeA - birthTimeB;
-            }
-            if (birthTimeA && !birthTimeB) return -1;
-            if (!birthTimeA && birthTimeB) return 1;
+    const teamCounters: Record<string, number> = {};
+    
+    for (let i = 0; i < sorted.length; i++) {
+        const p = sorted[i];
+        const teamId = p.teamId || 'N/A';
+        teamCounters[teamId] = (teamCounters[teamId] || 0) + 1;
+        
+        const hasDate = !!(p.aihDate && p.aihDate !== '--');
+        const newPos = hasDate ? i + 1 : 0;
+        const newTeamPos = hasDate ? teamCounters[teamId] : 0;
 
-            return 0;
-        });
-
-    const withoutDate = patients.filter(p => !p.aihDate || String(p.aihDate).trim() === '');
-
-    const positioned = withDate.map((p, idx) => ({ ...p, position: String(idx + 1) }));
-    const unpositioned = withoutDate.map(p => ({ ...p, position: '' }));
-
-    // Rebuild full list preserving original order for non-dated patients but updating positions
-    const positionMap = new Map<string, string>();
-    [...positioned, ...unpositioned].forEach(p => positionMap.set(p.id, String(p.position || '')));
-
-    return patients.map(p => ({ ...p, position: positionMap.get(p.id) ?? p.position }));
+        if (p.position !== newPos || p.teamPosition !== newTeamPos) {
+            await prisma.patient.update({
+                where: { id: p.id },
+                data: { 
+                    position: newPos,
+                    teamPosition: newTeamPos
+                }
+            });
+        }
+    }
 }
 
-function autoCalculateWaitTime(aih: unknown, surg: unknown): string {
+function autoCalculateWaitTime(aih: string | null | undefined, surg: string | null | undefined): number {
     const sAih = String(aih || '').trim();
     const sSurg = String(surg || '').trim();
-    if (!sAih || sAih === '--') return '';
+    if (!sAih || sAih === '--' || !sSurg || sSurg === '--') return 0;
 
     const parseDate = (d: string): Date | null => {
-        if (!d || d === '--') return null;
         if (d.includes('/')) {
             const parts = d.split('/');
             if (parts.length === 3) {
@@ -85,78 +98,138 @@ function autoCalculateWaitTime(aih: unknown, surg: unknown): string {
     };
 
     const start = parseDate(sAih);
-    if (!start || isNaN(start.getTime())) return '';
-
-    const hasSurgery = sSurg && sSurg !== '--';
-    if (!hasSurgery) return '';
-
     const end = parseDate(sSurg);
 
-    if (!end || isNaN(end.getTime())) return '';
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
 
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
 
     const diffMs = end.getTime() - start.getTime();
-    if (diffMs < 0) return '0';
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    return String(diffDays);
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
-export async function getPatientsAction() {
-    return await getPatientsFromSheet();
+export async function getPatientsAction(): Promise<Patient[]> {
+    const tenantId = await getHSRTenantId();
+    if (!tenantId) return [];
+
+    const patients = await prisma.patient.findMany({
+        where: { tenantId },
+        include: { team: true },
+        orderBy: [
+            { position: 'asc' },
+            { createdAt: 'asc' }
+        ]
+    });
+
+    return patients.map(p => ({
+        id: p.id,
+        name: p.fullName,
+        team: p.team?.name || '',
+        medicalRecord: p.medicalRecord || '',
+        cpf: p.cpf || '',
+        birthDate: p.birthDate || '',
+        aihDate: p.aihDate || '',
+        status: p.status || '',
+        priority: p.priority || '3',
+        needsICU: p.needsICU ? "Sim" : "Não",
+        latexAllergy: p.latexAllergy ? "Sim" : "Não",
+        jehovahsWitness: p.jehovahsWitness ? "Sim" : "Não",
+        clinicalData: p.clinicalData || '',
+        caseDiscussion: p.caseDiscussion || '',
+        preAnestheticEval: p.preAnestheticEval || '',
+        observations: p.observations || '',
+        preceptor: p.preceptorName || '',
+        resident: p.mainResidentName || '',
+        auxiliaryResidents: p.auxiliaryResidents || '',
+        examPdfPath: p.examPdfPath || '',
+        waitTime: String(p.waitTimeDays || 0),
+        position: (p.position && p.position > 0) ? String(p.position) : '',
+        teamPosition: (p.teamPosition && p.teamPosition > 0) ? String(p.teamPosition) : '',
+        lastUpdated: p.updatedAt.toISOString(),
+        lastUpdatedBy: p.lastUpdatedBy || 'SISTEMA'
+    })) as Patient[];
 }
 
-export async function createPatientAction(patient: Omit<Patient, 'id'>) {
-    console.log('Create requested for:', patient.name);
+export async function createPatientAction(patientData: Omit<Patient, 'id'>) {
     try {
-        const patients = await getPatientsFromSheet();
+        const tenantId = await getHSRTenantId();
+        if (!tenantId) throw new Error("Tenant not found");
+
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
 
-        const newPatient: Patient = {
-            ...patient,
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
-            name: String(patient.name),
-            lastUpdated: new Date().toISOString(),
-            lastUpdatedBy: decodedName,
-            waitTime: autoCalculateWaitTime(patient.aihDate, patient.surgeryDate)
-        };
-        
-        const withNew = [...patients, newPatient];
-        const updatedPatients = recalculatePositions(withNew);
-        await savePatientsToSheet(updatedPatients);
-        
-        const saved = updatedPatients.find(p => p.id === newPatient.id) || newPatient;
+        let teamId = null;
+        if (patientData.team) {
+            const team = await prisma.team.findFirst({
+                where: { name: String(patientData.team), tenantId }
+            });
+            teamId = team ? team.id : (await prisma.team.create({ data: { name: String(patientData.team), tenantId } })).id;
+        }
 
-        // Registrar log de auditoria
-        await logPatientAction(newPatient.id, newPatient.name, 'CREATE', decodedName);
-        await logAccess(decodedName, `CRIOU PACIENTE: ${newPatient.name}`).catch(console.error);
-        
-        return { success: true, patient: saved };
+        const waitTime = autoCalculateWaitTime(patientData.aihDate as string, patientData.surgeryDate as string);
+
+        const newPatient = await prisma.patient.create({
+            data: {
+                fullName: String(patientData.name || "NOME NÃO INFORMADO"),
+                tenantId,
+                teamId,
+                medicalRecord: String(patientData.medicalRecord || ""),
+                cpf: String(patientData.cpf || ""),
+                birthDate: String(patientData.birthDate || ""),
+                aihDate: String(patientData.aihDate || ""),
+                status: String(patientData.status || "AGUARDANDO AVALIAÇÃO"),
+                priority: String(patientData.priority || "3"),
+                needsICU: patientData.needsICU === "Sim",
+                latexAllergy: patientData.latexAllergy === "Sim",
+                jehovahsWitness: patientData.jehovahsWitness === "Sim",
+                clinicalData: String(patientData.clinicalData || ""),
+                caseDiscussion: String(patientData.caseDiscussion || ""),
+                preAnestheticEval: String(patientData.preAnestheticEval || ""),
+                observations: String(patientData.observations || ""),
+                preceptorName: String(patientData.preceptor || ""),
+                mainResidentName: String(patientData.resident || ""),
+                auxiliaryResidents: String(patientData.auxiliaryResidents || ""),
+                examPdfPath: String(patientData.examPdfPath || ""),
+                waitTimeDays: waitTime,
+                lastUpdatedBy: decodedName
+            }
+        });
+
+        await syncPositionsInDB(tenantId);
+        await logPatientAction(newPatient.id, newPatient.fullName, 'CREATE', decodedName);
+        await logAccess(decodedName, `CRIOU PACIENTE: ${newPatient.fullName}`).catch(console.error);
+
+        return { success: true };
     } catch (error) {
-        console.error('Erro ao criar paciente no Google Sheets:', error);
+        console.error('Error in createPatientAction:', error);
         return { success: false, error: 'Erro ao salvar paciente' };
     }
 }
 
 export async function updatePatientAction(patient: Patient) {
-    console.log('Update requested for:', patient.name);
     try {
-        const patients = await getPatientsFromSheet();
-        const schema = await getFieldSchema();
+        const tenantId = await getHSRTenantId();
+        if (!tenantId) throw new Error("Tenant not found");
+
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
 
-        const oldPatient = patients.find(p => p.id === patient.id);
-        
+        const oldPatient = await prisma.patient.findUnique({
+            where: { id: patient.id }
+        });
+
         if (oldPatient) {
+            const schema = await getFieldSchema();
             const changedFields: string[] = [];
+            const oldObj = oldPatient as any;
+            const newObj = patient as any;
+
             for (const field of schema) {
-                const oldVal = (oldPatient as Record<string, unknown>)[field.id];
-                const newVal = (patient as Record<string, unknown>)[field.id];
+                const oldVal = oldObj[field.id] || oldObj[field.id === 'name' ? 'fullName' : field.id];
+                const newVal = newObj[field.id];
                 
                 const sOld = Array.isArray(oldVal) ? JSON.stringify(oldVal) : String(oldVal || '');
                 const sNew = Array.isArray(newVal) ? JSON.stringify(newVal) : String(newVal || '');
@@ -166,51 +239,75 @@ export async function updatePatientAction(patient: Patient) {
                     changedFields.push(field.label);
                 }
             }
-            
-            const fieldsInfo = changedFields.length > 0 ? ` (${changedFields.join(', ')})` : '';
-            await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name}${fieldsInfo}`).catch(console.error);
+            if (changedFields.length > 0) {
+                await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name} (${changedFields.join(', ')})`).catch(console.error);
+            }
         }
 
-        const mapped = patients.map(p => 
-            p.id === patient.id ? { 
-                ...patient, 
-                lastUpdated: new Date().toISOString(), 
-                lastUpdatedBy: decodedName,
-                waitTime: autoCalculateWaitTime(patient.aihDate, patient.surgeryDate)
-            } : p
-        );
-        
-        const updatedPatients = recalculatePositions(mapped);
-        await savePatientsToSheet(updatedPatients);
-        
-        await logAccess(decodedName, `EDITOU PACIENTE: ${patient.name}`).catch(console.error);
+        let teamId = null;
+        if (patient.team) {
+            const team = await prisma.team.findFirst({
+                where: { name: String(patient.team), tenantId }
+            });
+            teamId = team ? team.id : (await prisma.team.create({ data: { name: String(patient.team), tenantId } })).id;
+        }
+
+        const waitTime = autoCalculateWaitTime(patient.aihDate as string, patient.surgeryDate as string);
+
+        await prisma.patient.update({
+            where: { id: patient.id },
+            data: {
+                fullName: String(patient.name),
+                teamId,
+                medicalRecord: String(patient.medicalRecord || ""),
+                cpf: String(patient.cpf || ""),
+                birthDate: String(patient.birthDate || ""),
+                aihDate: String(patient.aihDate || ""),
+                status: String(patient.status || ""),
+                priority: String(patient.priority || ""),
+                needsICU: patient.needsICU === "Sim",
+                latexAllergy: patient.latexAllergy === "Sim",
+                jehovahsWitness: patient.jehovahsWitness === "Sim",
+                clinicalData: String(patient.clinicalData || ""),
+                caseDiscussion: String(patient.caseDiscussion || ""),
+                preAnestheticEval: String(patient.preAnestheticEval || ""),
+                observations: String(patient.observations || ""),
+                preceptorName: String(patient.preceptor || ""),
+                mainResidentName: String(patient.resident || ""),
+                auxiliaryResidents: String(patient.auxiliaryResidents || ""),
+                examPdfPath: String(patient.examPdfPath || ""),
+                waitTimeDays: waitTime,
+                lastUpdatedBy: decodedName
+            }
+        });
+
+        await syncPositionsInDB(tenantId);
         return { success: true };
     } catch (error) {
-        console.error('Erro ao atualizar paciente no Google Sheets:', error);
+        console.error('Error in updatePatientAction:', error);
         return { success: false, error: 'Erro ao atualizar paciente' };
     }
 }
 
 export async function deletePatientAction(patientId: string) {
-    console.log('Delete requested for ID:', patientId);
     try {
-        const patients = await getPatientsFromSheet();
-        const patientToDelete = patients.find(p => p.id === patientId);
-        const filtered = patients.filter(p => p.id !== patientId);
-        const updatedPatients = recalculatePositions(filtered);
+        const tenantId = await getHSRTenantId();
+        const patient = await prisma.patient.findUnique({ where: { id: patientId } });
         
-        await savePatientsToSheet(updatedPatients);
+        await prisma.patient.delete({ where: { id: patientId } });
 
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
         
-        await logPatientAction(patientId, patientToDelete?.name || 'Desconhecido', 'DELETE', decodedName);
+        await logPatientAction(patientId, patient?.fullName || 'Desconhecido', 'DELETE', decodedName);
         await logAccess(decodedName, `EXCLUIU PACIENTE ID: ${patientId}`).catch(console.error);
+
+        if (tenantId) await syncPositionsInDB(tenantId);
 
         return { success: true };
     } catch (error) {
-        console.error('Delete Error no Google Sheets:', error);
+        console.error('Error in deletePatientAction:', error);
         return { success: false, error: 'Erro ao excluir no servidor' }; 
     }
 }
@@ -221,18 +318,17 @@ export async function getPatientChangeLogsAction() {
 
 export async function recalculateAllPositionsAction() {
     try {
-        const patients = await getPatientsFromSheet();
-        const reordered = recalculatePositions(patients);
-        await savePatientsToSheet(reordered);
+        const tenantId = await getHSRTenantId();
+        if (tenantId) await syncPositionsInDB(tenantId);
 
         const cookieStore = await cookies();
         const userName = cookieStore.get('username')?.value || 'Desconhecido';
         const decodedName = decodeURIComponent(userName);
         await logAccess(decodedName, 'RECALCULOU POSIÇÕES POR DATA AIH').catch(console.error);
 
-        return { success: true, updated: reordered.length };
+        return { success: true };
     } catch (error) {
-        console.error('Erro ao recalcular posições:', error);
+        console.error('Error in recalculateAllPositionsAction:', error);
         return { success: false, error: 'Erro ao recalcular posições' };
     }
 }

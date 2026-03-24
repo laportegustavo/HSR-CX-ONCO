@@ -55,7 +55,8 @@ const getColumnLetter = (index: number): string => {
 const INITIAL_SCHEMA: FieldSchema[] = [
     { id: 'id', label: 'ID', type: 'text', column: 0, isVisibleInCalendar: false, isRequired: true, order: 0, isSystem: true },
     { id: 'name', label: 'Nome do Paciente', type: 'text', column: 1, isVisibleInCalendar: true, isRequired: true, order: 1, isSystem: true },
-    { id: 'position', label: 'Posição', type: 'number', column: 30, isVisibleInCalendar: false, isRequired: false, order: 2 },
+    { id: 'position', label: 'Posição Geral', type: 'number', column: 30, isVisibleInCalendar: false, isRequired: false, order: 2 },
+    { id: 'teamPosition', label: 'Posição Equipe', type: 'number', column: 34, isVisibleInCalendar: false, isRequired: false, order: 2.5 },
     { id: 'birthDate', label: 'Data de Nascimento', type: 'date', column: 29, isVisibleInCalendar: false, isRequired: false, order: 3 },
     { id: 'age', label: 'Idade', type: 'text', column: 15, isVisibleInCalendar: false, isRequired: false, order: 4 },
     { id: 'team', label: 'Equipe', type: 'select', column: 2, isVisibleInCalendar: true, isRequired: true, order: 5, options: [] },

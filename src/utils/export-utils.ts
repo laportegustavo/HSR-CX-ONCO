@@ -37,3 +37,13 @@ export const downloadBackupAsJson = (data: unknown, fileName: string = `hsr_back
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 };
+
+export const downloadBackupAsExcel = (data: Patient[], fileName: string = `hsr_backup_${new Date().toISOString().split('T')[0]}.xlsx`) => {
+    // Para backup completo, exportamos todos os campos serializados.
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Backup Completo");
+
+    // Generate file
+    XLSX.writeFile(workbook, fileName);
+};
