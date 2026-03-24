@@ -492,8 +492,10 @@ export default function Dashboard() {
                                         }
                                     }}
                                     title={`Filtrar por ${team}`}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
-                                        isSelected ? "bg-[#d4af37] text-[#0a1f44] shadow-md font-bold" : "text-slate-300 hover:bg-white/5"
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all active:translate-y-1 ${
+                                        isSelected 
+                                            ? "bg-[#d4af37] text-[#0a1f44] font-black shadow-[0_4px_0_0_#b8962d,0_4px_10px_0_rgba(212,175,55,0.3)] border-t border-white/20" 
+                                            : "text-slate-300 hover:bg-white/5 hover:text-white border border-transparent"
                                     }`}
                                 >
                                     <div className="flex items-center gap-2 truncate">
@@ -545,7 +547,7 @@ export default function Dashboard() {
                         <button 
                             onClick={() => setShowRecalculateConfirm(true)}
                             disabled={isRecalculating}
-                            className={`w-full flex items-center gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 text-xs py-2 px-3 rounded-lg transition-all ${isRecalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`w-full flex items-center gap-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 text-xs py-2.5 px-3 rounded-xl transition-all active:translate-y-0.5 border border-orange-500/20 shadow-[0_2px_0_0_rgba(251,146,60,0.1)] ${isRecalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Recalcular todas as posições com base na data AIH"
                         >
                             <ArrowUpDown size={14} className={isRecalculating ? "animate-pulse" : ""} />
@@ -555,7 +557,7 @@ export default function Dashboard() {
 
                     <button 
                         onClick={() => setIsProfileOpen(true)}
-                        className="w-full flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2 px-3 rounded-lg transition-all"
+                        className="w-full flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 text-xs py-2.5 px-3 rounded-xl transition-all active:translate-y-0.5 border border-blue-500/20 shadow-[0_2px_0_0_rgba(96,165,250,0.1)]"
                         title="Configurações de Perfil"
                     >
                         <User size={14} />
@@ -579,7 +581,7 @@ export default function Dashboard() {
                             document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                             window.location.href = "/login";
                         }}
-                        className="w-full flex items-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs py-2 px-3 rounded-lg transition-all mt-2"
+                        className="w-full flex items-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs py-2 px-3 rounded-lg transition-all mt-2 active:scale-95 border border-rose-500/20 shadow-[0_2px_0_0_rgba(244,63,94,0.1)]"
                         title="Sair do sistema"
                     >
                         <CloseIcon size={14} className="rotate-45" />

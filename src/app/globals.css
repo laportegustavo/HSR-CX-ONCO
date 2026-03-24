@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  font-size: 106.25%; /* Increases base 16px to 17px (approx 1pt) */
 }
 
 @theme inline {
