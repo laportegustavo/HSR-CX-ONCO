@@ -153,6 +153,7 @@ export default function LoginPage() {
                                     className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)]"
                                     required
                                     disabled={isLoading}
+                                    title="Selecione o tipo de acesso"
                                 >
                                     <option value="Médico Residente">Médico Residente</option>
                                     <option value="Médico Preceptor">Médico Preceptor</option>
@@ -190,6 +191,7 @@ export default function LoginPage() {
                                     className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-500/30 focus:bg-white p-5 rounded-2xl outline-none text-slate-800 font-bold transition-all shadow-sm focus:shadow-[0_0_20px_rgba(37,99,235,0.1)]"
                                     required
                                     disabled={isLoading || recoverLoading}
+                                    title="Selecione o tipo de perfil para recuperação"
                                 >
                                     <option value="Médico Residente">Médico Residente</option>
                                     <option value="Médico Preceptor">Médico Preceptor</option>

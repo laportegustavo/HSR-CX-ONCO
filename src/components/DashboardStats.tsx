@@ -13,6 +13,34 @@ export interface DashboardStatsProps {
     activeTeams?: string[];
 }
 
+interface CustomTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+        value: number;
+        name: string;
+        color?: string;
+        payload: Record<string, unknown>;
+    }>;
+    label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100 ring-1 ring-slate-200/50">
+                {label && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>}
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color || '#3b82f6' }} />
+                    <p className="text-sm font-black text-slate-800">
+                        {payload[0].value} <span className="text-slate-400 font-bold ml-1">pacientes</span>
+                    </p>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export default function DashboardStats({ patients, activeTeams }: DashboardStatsProps) {
     const [selectedTeam, setSelectedTeam] = useState<string>("Todas");
     const [selectedSystem, setSelectedSystem] = useState<string>("Todos");
@@ -117,23 +145,6 @@ export default function DashboardStats({ patients, activeTeams }: DashboardStats
 
         return { statusData, teamData, avgWait, waitCount: waitTimes.length };
     }, [patients, selectedTeam, selectedSystem, activeTeams]);
-
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100 ring-1 ring-slate-200/50">
-                    {label && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>}
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color || '#3b82f6' }} />
-                        <p className="text-sm font-black text-slate-800">
-                            {payload[0].value} <span className="text-slate-400 font-bold ml-1">pacientes</span>
-                        </p>
-                    </div>
-                </div>
-            );
-        }
-        return null;
-    };
 
     const COLORS = ['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#64748b', '#78350f'];
 
